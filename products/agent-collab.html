@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="How agent-collab coordinates an architect agent and a builder agent through repo-local task files and a local broker, with git branches and pull requests as the contract boundary.">
+<title>agent-collab | A contract between two agents, kept in the repo</title>
+<style>
+:root{color-scheme:light;--bg:oklch(1 0 0);--ink:oklch(.23 .014 75);--muted:oklch(.44 .012 75);--brand:oklch(.87 .14 75);--surface:oklch(.96 0 0);--line:oklch(.81 .009 75);--accent:oklch(.37 .075 195);--good:oklch(.36 .08 155);--bad:oklch(.43 .15 28);--soft:oklch(.95 .025 155)}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--surface);color:var(--ink);font:16px/1.55 Cantarell,"Segoe UI",Arial,sans-serif}
+a{color:var(--accent);text-underline-offset:3px}
+a:hover{text-decoration-thickness:2px}
+a:focus-visible,button:focus-visible{outline:3px solid var(--accent);outline-offset:5px}
+.skip{position:absolute;left:16px;top:-100px;background:white;padding:10px;z-index:2}
+.skip:focus{top:10px}
+.toolbar{max-width:1160px;margin:auto;display:flex;justify-content:space-between;gap:20px;align-items:center;padding:20px 32px;font-size:14px}
+.toolbar p{margin:0}
+button{background:var(--ink);color:var(--bg);border:0;padding:10px 18px;border-radius:4px;font:inherit;font-weight:700;cursor:pointer}
+.document{max-width:1160px;margin:0 auto 40px;background:var(--bg)}
+.sheet{padding:40px 52px 32px}
+.sheet+.sheet{border-top:10px solid var(--surface)}
+.masthead,.folio{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.wordmark{font-size:30px;font-weight:800;letter-spacing:-.035em;display:flex;align-items:center;gap:10px}
+.mark{width:31px;height:31px}
+.edition{font-size:13px;color:var(--muted);text-align:right}
+.hero{background:var(--brand);padding:36px 38px;margin:27px 0 30px;display:grid;grid-template-columns:1.55fr 1fr;gap:30px;align-items:end}
+.audience{font-size:14px;font-weight:700;margin:0 0 13px}
+h1{font-size:clamp(36px,4.7vw,58px);line-height:1.04;letter-spacing:-.035em;margin:0;max-width:15ch}
+h1,h2,h3{text-wrap:balance}
+h2{font-size:28px;line-height:1.18;letter-spacing:-.02em;margin:0 0 14px}
+h3{font-size:18px;line-height:1.3;margin:0 0 8px}
+p{margin:0 0 14px;text-wrap:pretty;max-width:75ch}
+.hero p:last-child{margin:0;font-size:18px;line-height:1.5}
+.lead{font-size:19px;line-height:1.5;max-width:72ch}
+.benefits{display:grid;grid-template-columns:1fr 1fr 1fr;gap:26px;margin:25px 0 28px}
+.benefits p{font-size:15px;margin:0}
+.benefits h3{font-size:17px}
+.diagram{margin:20px 0 18px}
+.diagram svg{display:block;width:100%;height:auto}
+.diagram text{font-family:Cantarell,"Segoe UI",Arial,sans-serif;fill:var(--ink)}
+.diagram .label{font-size:16px;font-weight:700}
+.diagram .small{font-size:13px}
+.diagram .micro{font-size:12px}
+.diagram .muted{fill:var(--muted)}
+.diagram .on-dark{fill:var(--bg)}
+.diagram .box{fill:var(--bg);stroke:var(--line);stroke-width:1.5}
+.diagram .gray{fill:var(--surface)}
+.diagram .yellow{fill:var(--brand)}
+.diagram .dark{fill:var(--accent)}
+.diagram .wire{stroke:var(--accent);stroke-width:2;fill:none}
+.diagram .write{stroke:var(--ink);stroke-width:2;fill:none}
+.diagram .dash{stroke-dasharray:5 4}
+figcaption,.caption{font-size:13px;color:var(--muted);margin-top:9px}
+.scope-note{background:var(--surface);padding:16px 20px;font-size:15px;margin-top:22px}
+.scope-note p{margin:0}
+.folio{border-top:1px solid var(--line);margin-top:28px;padding-top:13px;color:var(--muted);font-size:12px}
+.folio span:last-child{white-space:nowrap}
+.section-heading{margin:12px 0 24px}
+.section-heading p{font-size:17px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:34px}
+.example{background:var(--surface);padding:22px 25px;margin:20px 0}
+.example-header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:12px}
+.tag{font-size:12px;font-weight:700;padding:4px 9px;background:var(--bg);border:1px solid var(--line);border-radius:3px}
+.example-header h3{margin:0}
+pre{font:13px/1.65 "Adwaita Mono",Consolas,monospace;margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+code{font-family:"Adwaita Mono",Consolas,monospace;font-size:.88em;overflow-wrap:anywhere}
+.outcomes{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:20px 0 26px}
+.outcome{border-top:3px solid var(--good);padding-top:12px}
+.outcome.fail{border-color:var(--bad)}
+.outcome h3{color:var(--good)}
+.outcome.fail h3{color:var(--bad)}
+.outcome p{font-size:15px;margin:0}
+.comparison{width:100%;border-collapse:collapse;font-size:14px;margin:18px 0 20px}
+.comparison caption{text-align:left;font-size:18px;font-weight:700;margin-bottom:10px}
+.comparison th{text-align:left;font-size:13px;background:var(--surface);padding:10px 12px}
+.comparison td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+.comparison th:first-child{width:22%}
+.comparison td:first-child{font-weight:700}
+.note{font-size:14px;color:var(--muted)}
+.steps{padding:0;margin:0;list-style:none;counter-reset:step}
+.steps li{counter-increment:step;position:relative;padding-left:38px;margin-bottom:17px}
+.steps li:before{content:counter(step);position:absolute;left:0;top:0;width:25px;height:25px;border-radius:50%;background:var(--brand);text-align:center;font-weight:700;line-height:25px}
+.steps strong{display:block}
+.steps p{font-size:14px;margin:3px 0 0}
+.setup{background:var(--surface);padding:20px 23px}
+.setup h3{font-size:15px}
+.setup pre+ h3{margin-top:17px}
+.closing{background:var(--brand);padding:21px 25px;margin:24px 0 20px}
+.closing h3{font-size:21px}
+.closing p{margin:0;font-size:15px}
+.sources{font-size:12px;color:var(--muted)}
+.sources p{margin-bottom:6px}
+.sources a{color:inherit}
+.mobile-flow{display:none}
+.preservation{margin-top:22px}
+.preservation p{font-size:15px}
+.preservation strong{color:var(--ink)}
+
+@media screen and (max-width:760px){.toolbar{padding:16px 20px}
+.toolbar p{max-width:21ch}
+.sheet{padding:28px 22px}
+.hero{padding:26px;grid-template-columns:1fr;gap:22px;margin-top:22px}
+.hero p:last-child{font-size:17px}
+.benefits{grid-template-columns:1fr;gap:18px}
+.two-col{grid-template-columns:1fr;gap:24px}
+.edition{max-width:135px}
+.outcomes{grid-template-columns:1fr}
+.diagram.wide svg{display:none}
+.mobile-flow{display:block;margin:0;padding:20px 20px 20px 40px;background:var(--surface)}
+.mobile-flow li{margin-bottom:12px;font-size:15px}
+.mobile-flow li:last-child{margin:0}
+.comparison th,.comparison td{padding:9px 6px;font-size:13px}
+.example{padding:18px}
+.example-header{align-items:flex-start;flex-direction:column}
+.folio{font-size:11px}
+.wordmark{font-size:27px}
+.section-heading{margin-top:0}
+h2{font-size:26px}
+}
+
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}
+}
+
+@page{size:A4;margin:12mm}
+
+@media print{body{background:white;font-size:10pt;line-height:1.4;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.toolbar,.skip{display:none}
+.document{width:auto;max-width:none;margin:0}
+.sheet{padding:0;break-after:page}
+.sheet:last-child{break-after:auto}
+.sheet+.sheet{border:0}
+.wordmark{font-size:22pt}
+.edition{font-size:9pt}
+.hero{margin:16px 0 19px;padding:24px;gap:22px;grid-template-columns:1.4fr 1fr}
+h1{font-size:32pt}
+.hero p:last-child{font-size:12pt}
+.audience{font-size:9pt}
+h2{font-size:19pt}
+h3{font-size:12pt}
+.lead{font-size:12pt}
+.benefits{margin:17px 0;gap:18px}
+.benefits h3{font-size:11pt}
+.benefits p,.scope-note,.outcome p,.preservation p{font-size:10pt}
+.diagram{margin:14px 0}
+.diagram.wide svg{display:block}
+.mobile-flow{display:none}
+.scope-note{margin-top:15px;padding:12px 15px}
+.folio{margin-top:20px;padding-top:9px;font-size:8pt}
+.section-heading{margin:10px 0 18px}
+.section-heading p{font-size:11pt}
+.example{margin:14px 0;padding:15px 19px}
+.example-header{margin-bottom:8px}
+pre{font-size:8.5pt;line-height:1.55}
+.outcomes{margin:16px 0 20px}
+.comparison{font-size:9pt;margin:14px 0}
+.comparison th,.comparison td{padding:8px;font-size:9pt}
+.note,.steps p{font-size:9pt}
+.two-col{gap:24px}
+.steps li{margin-bottom:13px}
+.setup{padding:17px}
+.closing{margin:18px 0 15px;padding:16px 20px}
+.closing h3{font-size:14pt}
+.closing p{font-size:10pt}
+.sources{font-size:8pt}
+figcaption,.caption{font-size:8pt}
+.preservation{margin-top:16px}
+a{color:inherit;text-decoration:none}
+.diagram,.outcome,.setup,.comparison tr,.closing{break-inside:avoid}
+}
+
+@media print{
+.sheet:last-child .section-heading{margin:0 0 12px}
+
+.sheet:last-child .section-heading p{font-size:10pt;margin-bottom:8px}
+
+.sheet:last-child .steps p{font-size:8.5pt;line-height:1.4}
+
+.sheet:last-child .steps li{margin-bottom:10px}
+
+.sheet:last-child .setup{padding:13px}
+
+.sheet:last-child .setup pre{font-size:8pt;line-height:1.45}
+
+.sheet:last-child .setup pre+h3{margin-top:12px}
+
+.sheet:last-child .diagram{margin:10px 0}
+
+.sheet:last-child .comparison{margin:10px 0}
+
+.sheet:last-child .comparison td,.sheet:last-child .comparison th{padding:4px 8px;font-size:8.5pt}
+
+.sheet:last-child .note{font-size:8.5pt;margin-bottom:10px}
+
+.sheet:last-child .closing{margin:8px 0;padding:10px 16px}
+
+.sheet:last-child .closing h3{font-size:12pt;margin-bottom:5px}
+
+.sheet:last-child .closing p{font-size:9pt}
+
+.sheet:last-child .sources{font-size:7.5pt;line-height:1.35}
+
+.sheet:last-child .folio{margin-top:8px;padding-top:7px}
+
+}
+
+
+</style>
+</head>
+<body>
+<a class="skip" href="#content">Skip to the product brief</a>
+<div class="toolbar"><p><a href="index.html">All products</a> · Technical product brief · two-agent protocol</p><button type="button" onclick="window.print()">Print / save PDF</button></div>
+<main id="content" class="document">
+
+<section class="sheet" aria-labelledby="title">
+<header class="masthead"><div class="wordmark"><svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="4" width="24" height="24" rx="5" fill="none" stroke="currentColor" stroke-width="3"/><path d="M10 16h12M16 10v12" stroke="currentColor" stroke-width="3" fill="none"/></svg>agent-collab</div><div class="edition">Stable, not under active development<br>44 tests · Python</div></header>
+<div class="hero"><div><p class="audience">For two coding agents on one codebase</p><h1 id="title">A contract between two agents, kept in the repo.</h1></div><p>agent-collab is a repo-local, asynchronous collaboration protocol for two AI coding agents. One architects: it plans tasks and reviews pull requests. One builds: it implements and opens pull requests. Git branches and pull requests are the contract boundary. The human stays out of band as tech lead.</p></div>
+<p class="lead">Two layers: <code>.collab/</code> files for durable task state, inboxes, and review history, and a lightweight local broker for real-time "your turn" signals.</p>
+<div class="benefits"><div><h3>Durable state in files</h3><p><code>.collab/tasks/*.json</code> is the source of truth. Claims, handoffs, reviews, and completions are recorded there, and <code>state.json</code> is only a derived summary.</p></div><div><h3>Instant signals through a broker</h3><p>A local HTTP broker on 127.0.0.1 carries claimed, PR ready, merged, and resume signals, with token auth on by default and a long-poll <code>recv</code>.</p></div><div><h3>Branches and pull requests as the boundary</h3><p>The builder pushes a branch and opens a pull request; the architect reviews the diff and records the decision. Nothing merges through chat.</p></div></div>
+<h2>Where the protocol sits between the two agents</h2>
+<figure class="diagram wide">
+<svg viewBox="0 0 960 325" role="img" aria-labelledby="flow-title flow-desc"><title id="flow-title">An architect and a builder coordinate through task files and a broker</title><desc id="flow-desc">The architect creates tasks, reviews, and completes them. The builder claims, implements, and hands off. Task files under .collab hold the durable lifecycle truth; the broker carries your-turn pings, chat, and history. The contract is a branch per task, a pull request for review, and a review decision on record. The builder opens the pull request and the architect merges it.</desc><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="var(--accent)"/></marker><marker id="black-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="var(--ink)"/></marker></defs><rect x="2" y="2" width="956" height="207" rx="7" class="gray"/><text x="22" y="29" class="label">One repository, two agents</text><text x="935" y="29" text-anchor="end" class="small muted">Human as tech lead, out of band</text><rect x="22" y="50" width="256" height="73" rx="5" class="box"/><text x="39" y="78" class="label">Architect agent</text><text x="39" y="101" class="small">new-task → review → complete</text><path d="M279 86H347" class="wire" marker-end="url(#arrow)"/><text x="312" y="75" text-anchor="middle" class="micro">then</text><rect x="351" y="50" width="319" height="137" rx="5" class="yellow"/><text x="371" y="78" class="label">.collab/ files + local broker</text><text x="371" y="107" class="small">Task files: durable lifecycle truth</text><text x="371" y="130" class="small">Broker: your-turn pings, chat, history</text><text x="371" y="165" class="micro">Git hooks and a sync daemon keep both fresh</text><path d="M670 112H717" class="wire" marker-end="url(#arrow)"/><rect x="722" y="50" width="215" height="137" rx="5" class="dark"/><text x="739" y="79" class="label on-dark">The contract</text><text x="739" y="109" class="small on-dark">Branch per task</text><text x="739" y="133" class="small on-dark">Pull request for review</text><text x="739" y="157" class="small on-dark">Decision on record</text><rect x="22" y="146" width="256" height="41" rx="5" class="box"/><text x="39" y="172" class="small">Builder: claim → implement → handoff</text><path d="M278 166H346" class="wire" marker-end="url(#arrow)"/><path d="M150 123V140" class="wire" marker-end="url(#arrow)"/><path d="M22 86H9V284H349" class="write" marker-end="url(#black-arrow)"/><rect x="38" y="267" width="229" height="25" fill="var(--bg)"/><text x="49" y="284" class="small">Builder opens, architect merges</text><rect x="351" y="250" width="319" height="64" rx="5" class="box"/><text x="510" y="277" text-anchor="middle" class="label">GitHub pull requests</text><text x="510" y="299" text-anchor="middle" class="small">gh pr create, gh pr diff, gh pr merge</text><path d="M488 190V246" class="wire" marker-end="url(#arrow)"/><path d="M533 248V192" class="wire" marker-end="url(#arrow)"/><text x="550" y="230" class="small">Handoff and review</text></svg>
+<ol class="mobile-flow"><li><strong>The architect writes a task.</strong> With files, a verify command, acceptance criteria, and the source plan.</li><li><strong>The builder claims it and pings the broker.</strong> Implements on a branch, verifies, pushes, and opens a pull request.</li><li><strong>The builder hands off with the pull request link.</strong> The architect reviews the diff and records the decision.</li><li><strong>Merge, then complete.</strong> The architect merges; the task is closed with a summary and the next task is signaled.</li></ol>
+<figcaption>Promote any important chat decision back into <code>.collab</code> with <code>handoff</code>, <code>review</code>, <code>complete</code>, or <code>message</code>. Chat is coordination only; the task files decide.</figcaption>
+</figure>
+<div class="scope-note"><p><strong>What the protocol guarantees.</strong> Every task has one durable record with its owner, verification command, acceptance criteria, handoff summary, pull request link, and review decision. A stale task is flagged by <code>check-stale</code>, and <code>doctor</code> says whether identity, hooks, daemon heartbeat, and sync are healthy for a role.</p></div>
+<footer class="folio"><span>agent-collab · Two agents, one contract</span><span>How it fits · 1 / 3</span></footer>
+</section>
+
+<section class="sheet" aria-labelledby="example-title">
+<div class="section-heading"><h2 id="example-title">From a task file to a merged pull request</h2><p>The architect writes the task with a verify command and acceptance criteria. The builder claims it, implements, verifies, pushes, and hands off with the pull request link. The architect reviews and records the decision.</p></div>
+<div class="example"><div class="example-header"><h3>Example: one task, end to end</h3><span class="tag">Real commands</span></div><pre>python3 scripts/collab.py new-task "Add retry to the fetch client" \
+  --created-by architect --assigned-role builder \
+  --verify-cmd "pytest -q" --file src/fetch.py --accept "tests pass"
+python3 scripts/collab.py claim TASK-001 --actor builder
+python3 scripts/collab.py verify TASK-001 --actor builder
+python3 scripts/collab.py handoff TASK-001 --actor builder --summary "done" --pr-url &lt;url&gt;
+python3 scripts/collab.py review TASK-001 --actor architect --decision approve --summary "lgtm"
+python3 scripts/collab.py complete TASK-001 --actor builder --summary "merged"</pre><p class="caption"><code>status</code> summarizes the queue and <code>next --role builder</code> shows what is queued for a role.</p></div>
+<figure class="diagram wide"><svg viewBox="0 0 960 208" role="img" aria-labelledby="proof-title proof-desc"><title id="proof-title">The architect, the builder, and the record each task leaves</title><desc id="proof-desc">The architect creates the task with a verify command and acceptance criteria, reviews the pull request diff, and records the decision. The builder claims, implements on a branch, verifies, and hands off with the pull request link, pinging the broker at each step. The record is the task file, the review history, the broker history by channel, and a completion after merge.</desc><rect x="2" y="2" width="270" height="186" rx="5" class="box"/><text x="20" y="31" class="label">Architect</text><text x="20" y="64" class="small">new-task with --verify-cmd</text><text x="20" y="91" class="small">--accept "tests pass"</text><text x="20" y="118" class="small">gh pr diff, then review</text><text x="20" y="145" class="small">review --decision approve</text><text x="20" y="171" class="micro muted">Reviews the diff itself</text><rect x="340" y="2" width="280" height="186" rx="5" class="yellow"/><text x="358" y="31" class="label">Builder</text><text x="358" y="64" class="small">claim TASK-001</text><text x="358" y="91" class="small">implement on a branch</text><text x="358" y="118" class="small">verify TASK-001</text><text x="358" y="145" class="small">handoff --pr-url</text><text x="358" y="171" class="micro muted">Broker ping at each step</text><rect x="690" y="2" width="268" height="186" rx="5" class="box"/><text x="708" y="31" class="label">Record</text><text x="708" y="64" class="small">.collab/tasks/TASK-001.json</text><text x="708" y="91" class="small">.collab/reviews/</text><text x="708" y="118" class="small">broker history by channel</text><text x="708" y="145" class="small">complete after merge</text><text x="708" y="171" class="micro muted">Stale work is flagged</text><path d="M274 95H335" class="wire" marker-end="url(#arrow)"/><path d="M685 95H625" class="wire" marker-end="url(#arrow)"/></svg><ol class="mobile-flow"><li><strong>Architect:</strong> creates the task with a verify command and acceptance criteria, reviews the diff, records the decision.</li><li><strong>Builder:</strong> claims, implements on a branch, verifies, and hands off with the pull request link, pinging the broker at each step.</li><li><strong>Record:</strong> the task file, the review history, the broker history by channel, and a completion after merge.</li></ol><figcaption>Lessons from live use are in the README: the broker has to be used during the work as well as at startup and handoff, and a false picture from stale output is corrected with both a broker wakeup and a durable <code>.collab</code> note.</figcaption></figure>
+<div class="outcomes"><div class="outcome"><h3>Approved and completed</h3><p>The review decision is recorded, the architect merges the pull request, and <code>complete</code> closes the task with a summary.</p></div><div class="outcome fail"><h3>Changes requested, or stale</h3><p>The builder addresses the feedback on the same task. In-progress or in-review work with no recent activity is flagged by <code>check-stale</code>, so nothing waits silently.</p></div></div>
+
+<div class="scope-note"><p><strong>Where it stands.</strong> Built and used on one private product in spring 2026. The architect and builder split it demonstrates moved into a larger private studio, so the protocol is stable and not under active development. Bind the broker off loopback or disable auth only when you accept the trade.</p></div>
+<footer class="folio"><span>agent-collab · Two agents, one contract</span><span>What it proves · 2 / 3</span></footer>
+</section>
+
+<section class="sheet" aria-labelledby="setup-title">
+<div class="section-heading"><h2 id="setup-title">Drop it into a repository</h2><p>Copy one script into your repository, initialize the workspace, and run the broker in a second terminal.</p></div>
+<div class="two-col"><ol class="steps"><li><strong>Copy and init.</strong><p>Copy <code>collab.py</code> into <code>scripts/</code>, run <code>init</code> to create <code>.collab/</code>, and add <code>.collab/</code> to <code>.gitignore</code>: it is session state and stays out of commits.</p></li><li><strong>Enable the runtime per role.</strong><p><code>enable</code> writes repo-local identity under <code>.collab/runtime/</code>, installs git hooks, and records a sync checkpoint. <code>doctor</code> and <code>daemon up</code> keep freshness enforced.</p></li><li><strong>Start the broker.</strong><p><code>brokerctl.py up</code> starts the broker with token auth and writes the token to a per-user file so other local agents can connect. <code>onboard</code> prints a one-screen quickstart per role.</p></li></ol><div class="setup"><h3>Workspace</h3><pre>cp collab.py /path/to/your-repo/scripts/collab.py
+cd /path/to/your-repo
+python3 scripts/collab.py init
+python3 scripts/collab.py enable --role builder --actor builder --peer architect --enforce warn
+python3 scripts/collab.py daemon up --role builder</pre><h3>Broker</h3><pre>python3 brokerctl.py up
+python3 brokerctl.py onboard --role builder
+python3 brokerctl.py recv --role builder --wait 60</pre><p class="caption">An idle <code>recv --wait 60</code> does not block <code>send</code>, <code>history</code>, or <code>status</code> from other agents.</p></div></div>
+<figure class="diagram wide"><svg viewBox="0 0 960 137" role="img" aria-labelledby="evidence-title evidence-desc"><title id="evidence-title">Durable truth in files, live signals through the broker, health from doctor</title><desc id="evidence-desc">Task files, reviews, and inboxes under .collab are the durable truth, with state.json derived from them. The broker on loopback carries live signals with token auth, and after_id resumes a listener without replaying old messages. doctor reports identity, hooks, heartbeat, and sync, and check-stale flags silent work.</desc><rect x="2" y="2" width="290" height="99" rx="5" class="box"/><text x="19" y="29" class="label">Durable truth</text><text x="19" y="55" class="small">.collab/tasks/*.json, reviews, inboxes</text><text x="19" y="79" class="micro muted">state.json is derived from them</text><rect x="340" y="2" width="279" height="112" rx="5" class="yellow"/><text x="357" y="29" class="label">Live signals</text><text x="357" y="55" class="small">Broker on 127.0.0.1:9111 with token</text><text x="357" y="74" class="small">auth</text><text x="357" y="95" class="micro muted">after_id resumes without replay</text><rect x="667" y="2" width="291" height="112" rx="5" class="dark"/><text x="684" y="29" class="label on-dark">Health</text><text x="684" y="55" class="small on-dark">doctor: identity, hooks, heartbeat,</text><text x="684" y="74" class="small on-dark">sync</text><text x="684" y="95" class="micro on-dark">check-stale flags silent work</text><path d="M295 51H335" class="wire" marker-end="url(#arrow)"/><path d="M622 51H662" class="wire" marker-end="url(#arrow)"/></svg><ol class="mobile-flow"><li>Task files, reviews, and inboxes under <code>.collab</code> are the durable truth; <code>state.json</code> is derived.</li><li>The broker on loopback carries live signals with token auth; <code>after_id</code> resumes a listener without replay.</li><li><code>doctor</code> reports identity, hooks, heartbeat, and sync; <code>check-stale</code> flags silent work.</li></ol><figcaption>Message bodies reject control characters, and the CLI escapes stale control bytes before printing.</figcaption></figure>
+<table class="comparison"><caption>Lifecycle commands</caption><thead><tr><th scope="col">Command</th><th scope="col">Who</th><th scope="col">Effect</th></tr></thead><tbody><tr><td><code>new-task</code></td><td>Architect</td><td>Creates the task with files, a verify command, acceptance criteria, and the source plan</td></tr><tr><td><code>claim</code> / <code>verify</code> / <code>handoff</code></td><td>Builder</td><td>Takes the task, runs verification, sends it for review with the pull request link</td></tr><tr><td><code>review</code> / <code>complete</code></td><td>Architect, then builder</td><td>Records the decision; closes the task after merge</td></tr><tr><td><code>check-stale</code> / <code>watch</code></td><td>Either</td><td>Flags stale work; a background watcher with heartbeat</td></tr><tr><td><code>message</code> / broker <code>chat</code></td><td>Either</td><td>Async notes in <code>.collab</code>; short live clarifications</td></tr></tbody></table>
+<p class="note">Check <code>git config user.email</code> before committing, and prefer a git include scoped by remote URL so the right identity applies automatically.</p>
+<div class="closing"><h3>A focused first evaluation</h3><p>Run one small task through the full loop with two agent sessions: new-task, claim, handoff with a real pull request, review, merge, complete. Then read the task file and the broker history.</p></div>
+<div class="sources"><p><strong>Engineering basis.</strong> Prepared 7 November 2026 from repository revision <code>efbdc54</code>. The brief describes that revision; the protocol is not under active development.</p><p>Source documents: <a href="https://github.com/ostinato-forge/agent-collab">repository</a>. </p></div>
+<footer class="folio"><span>agent-collab · Stable</span><span>Adoption and evidence · 3 / 3</span></footer>
+</section>
+</main>
+</body>
+</html>

@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="How Agent Efficiency watches a coding-agent session on your own machine, points out repeated work, and ties test results to the code they ran on. A technical product brief.">
+<title>Agent Efficiency | Fewer wasted turns, proof a change was checked</title>
+<style>
+:root{color-scheme:light;--bg:oklch(1 0 0);--ink:oklch(.23 .014 75);--muted:oklch(.44 .012 75);--brand:oklch(.87 .14 75);--surface:oklch(.96 0 0);--line:oklch(.81 .009 75);--accent:oklch(.37 .075 195);--good:oklch(.36 .08 155);--bad:oklch(.43 .15 28);--soft:oklch(.95 .025 155)}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--surface);color:var(--ink);font:16px/1.55 Cantarell,"Segoe UI",Arial,sans-serif}
+a{color:var(--accent);text-underline-offset:3px}
+a:hover{text-decoration-thickness:2px}
+a:focus-visible,button:focus-visible{outline:3px solid var(--accent);outline-offset:5px}
+.skip{position:absolute;left:16px;top:-100px;background:white;padding:10px;z-index:2}
+.skip:focus{top:10px}
+.toolbar{max-width:1160px;margin:auto;display:flex;justify-content:space-between;gap:20px;align-items:center;padding:20px 32px;font-size:14px}
+.toolbar p{margin:0}
+button{background:var(--ink);color:var(--bg);border:0;padding:10px 18px;border-radius:4px;font:inherit;font-weight:700;cursor:pointer}
+.document{max-width:1160px;margin:0 auto 40px;background:var(--bg)}
+.sheet{padding:40px 52px 32px}
+.sheet+.sheet{border-top:10px solid var(--surface)}
+.masthead,.folio{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.wordmark{font-size:30px;font-weight:800;letter-spacing:-.035em;display:flex;align-items:center;gap:10px}
+.mark{width:31px;height:31px}
+.edition{font-size:13px;color:var(--muted);text-align:right}
+.hero{background:var(--brand);padding:36px 38px;margin:27px 0 30px;display:grid;grid-template-columns:1.55fr 1fr;gap:30px;align-items:end}
+.audience{font-size:14px;font-weight:700;margin:0 0 13px}
+h1{font-size:clamp(36px,4.7vw,58px);line-height:1.04;letter-spacing:-.035em;margin:0;max-width:15ch}
+h1,h2,h3{text-wrap:balance}
+h2{font-size:28px;line-height:1.18;letter-spacing:-.02em;margin:0 0 14px}
+h3{font-size:18px;line-height:1.3;margin:0 0 8px}
+p{margin:0 0 14px;text-wrap:pretty;max-width:75ch}
+.hero p:last-child{margin:0;font-size:18px;line-height:1.5}
+.lead{font-size:19px;line-height:1.5;max-width:72ch}
+.benefits{display:grid;grid-template-columns:1fr 1fr 1fr;gap:26px;margin:25px 0 28px}
+.benefits p{font-size:15px;margin:0}
+.benefits h3{font-size:17px}
+.diagram{margin:20px 0 18px}
+.diagram svg{display:block;width:100%;height:auto}
+.diagram text{font-family:Cantarell,"Segoe UI",Arial,sans-serif;fill:var(--ink)}
+.diagram .label{font-size:16px;font-weight:700}
+.diagram .small{font-size:13px}
+.diagram .micro{font-size:12px}
+.diagram .muted{fill:var(--muted)}
+.diagram .on-dark{fill:var(--bg)}
+.diagram .box{fill:var(--bg);stroke:var(--line);stroke-width:1.5}
+.diagram .gray{fill:var(--surface)}
+.diagram .yellow{fill:var(--brand)}
+.diagram .dark{fill:var(--accent)}
+.diagram .wire{stroke:var(--accent);stroke-width:2;fill:none}
+.diagram .write{stroke:var(--ink);stroke-width:2;fill:none}
+.diagram .dash{stroke-dasharray:5 4}
+figcaption,.caption{font-size:13px;color:var(--muted);margin-top:9px}
+.scope-note{background:var(--surface);padding:16px 20px;font-size:15px;margin-top:22px}
+.scope-note p{margin:0}
+.folio{border-top:1px solid var(--line);margin-top:28px;padding-top:13px;color:var(--muted);font-size:12px}
+.folio span:last-child{white-space:nowrap}
+.section-heading{margin:12px 0 24px}
+.section-heading p{font-size:17px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:34px}
+.example{background:var(--surface);padding:22px 25px;margin:20px 0}
+.example-header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:12px}
+.tag{font-size:12px;font-weight:700;padding:4px 9px;background:var(--bg);border:1px solid var(--line);border-radius:3px}
+.example-header h3{margin:0}
+pre{font:13px/1.65 "Adwaita Mono",Consolas,monospace;margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+code{font-family:"Adwaita Mono",Consolas,monospace;font-size:.88em;overflow-wrap:anywhere}
+.outcomes{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:20px 0 26px}
+.outcome{border-top:3px solid var(--good);padding-top:12px}
+.outcome.fail{border-color:var(--bad)}
+.outcome h3{color:var(--good)}
+.outcome.fail h3{color:var(--bad)}
+.outcome p{font-size:15px;margin:0}
+.comparison{width:100%;border-collapse:collapse;font-size:14px;margin:18px 0 20px}
+.comparison caption{text-align:left;font-size:18px;font-weight:700;margin-bottom:10px}
+.comparison th{text-align:left;font-size:13px;background:var(--surface);padding:10px 12px}
+.comparison td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+.comparison th:first-child{width:22%}
+.comparison td:first-child{font-weight:700}
+.note{font-size:14px;color:var(--muted)}
+.steps{padding:0;margin:0;list-style:none;counter-reset:step}
+.steps li{counter-increment:step;position:relative;padding-left:38px;margin-bottom:17px}
+.steps li:before{content:counter(step);position:absolute;left:0;top:0;width:25px;height:25px;border-radius:50%;background:var(--brand);text-align:center;font-weight:700;line-height:25px}
+.steps strong{display:block}
+.steps p{font-size:14px;margin:3px 0 0}
+.setup{background:var(--surface);padding:20px 23px}
+.setup h3{font-size:15px}
+.setup pre+ h3{margin-top:17px}
+.closing{background:var(--brand);padding:21px 25px;margin:24px 0 20px}
+.closing h3{font-size:21px}
+.closing p{margin:0;font-size:15px}
+.sources{font-size:12px;color:var(--muted)}
+.sources p{margin-bottom:6px}
+.sources a{color:inherit}
+.mobile-flow{display:none}
+.preservation{margin-top:22px}
+.preservation p{font-size:15px}
+.preservation strong{color:var(--ink)}
+
+@media screen and (max-width:760px){.toolbar{padding:16px 20px}
+.toolbar p{max-width:21ch}
+.sheet{padding:28px 22px}
+.hero{padding:26px;grid-template-columns:1fr;gap:22px;margin-top:22px}
+.hero p:last-child{font-size:17px}
+.benefits{grid-template-columns:1fr;gap:18px}
+.two-col{grid-template-columns:1fr;gap:24px}
+.edition{max-width:135px}
+.outcomes{grid-template-columns:1fr}
+.diagram.wide svg{display:none}
+.mobile-flow{display:block;margin:0;padding:20px 20px 20px 40px;background:var(--surface)}
+.mobile-flow li{margin-bottom:12px;font-size:15px}
+.mobile-flow li:last-child{margin:0}
+.comparison th,.comparison td{padding:9px 6px;font-size:13px}
+.example{padding:18px}
+.example-header{align-items:flex-start;flex-direction:column}
+.folio{font-size:11px}
+.wordmark{font-size:27px}
+.section-heading{margin-top:0}
+h2{font-size:26px}
+}
+
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}
+}
+
+@page{size:A4;margin:12mm}
+
+@media print{body{background:white;font-size:10pt;line-height:1.4;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.toolbar,.skip{display:none}
+.document{width:auto;max-width:none;margin:0}
+.sheet{padding:0;break-after:page}
+.sheet:last-child{break-after:auto}
+.sheet+.sheet{border:0}
+.wordmark{font-size:22pt}
+.edition{font-size:9pt}
+.hero{margin:16px 0 19px;padding:24px;gap:22px;grid-template-columns:1.4fr 1fr}
+h1{font-size:32pt}
+.hero p:last-child{font-size:12pt}
+.audience{font-size:9pt}
+h2{font-size:19pt}
+h3{font-size:12pt}
+.lead{font-size:12pt}
+.benefits{margin:17px 0;gap:18px}
+.benefits h3{font-size:11pt}
+.benefits p,.scope-note,.outcome p,.preservation p{font-size:10pt}
+.diagram{margin:14px 0}
+.diagram.wide svg{display:block}
+.mobile-flow{display:none}
+.scope-note{margin-top:15px;padding:12px 15px}
+.folio{margin-top:20px;padding-top:9px;font-size:8pt}
+.section-heading{margin:10px 0 18px}
+.section-heading p{font-size:11pt}
+.example{margin:14px 0;padding:15px 19px}
+.example-header{margin-bottom:8px}
+pre{font-size:8.5pt;line-height:1.55}
+.outcomes{margin:16px 0 20px}
+.comparison{font-size:9pt;margin:14px 0}
+.comparison th,.comparison td{padding:8px;font-size:9pt}
+.note,.steps p{font-size:9pt}
+.two-col{gap:24px}
+.steps li{margin-bottom:13px}
+.setup{padding:17px}
+.closing{margin:18px 0 15px;padding:16px 20px}
+.closing h3{font-size:14pt}
+.closing p{font-size:10pt}
+.sources{font-size:8pt}
+figcaption,.caption{font-size:8pt}
+.preservation{margin-top:16px}
+a{color:inherit;text-decoration:none}
+.diagram,.outcome,.setup,.comparison tr,.closing{break-inside:avoid}
+}
+
+@media print{
+.sheet:last-child .section-heading{margin:0 0 12px}
+
+.sheet:last-child .section-heading p{font-size:10pt;margin-bottom:8px}
+
+.sheet:last-child .steps p{font-size:8.5pt;line-height:1.4}
+
+.sheet:last-child .steps li{margin-bottom:10px}
+
+.sheet:last-child .setup{padding:13px}
+
+.sheet:last-child .setup pre{font-size:8pt;line-height:1.45}
+
+.sheet:last-child .setup pre+h3{margin-top:12px}
+
+.sheet:last-child .diagram{margin:10px 0}
+
+.sheet:last-child .comparison{margin:10px 0}
+
+.sheet:last-child .comparison td,.sheet:last-child .comparison th{padding:4px 8px;font-size:8.5pt}
+
+.sheet:last-child .note{font-size:8.5pt;margin-bottom:10px}
+
+.sheet:last-child .closing{margin:8px 0;padding:10px 16px}
+
+.sheet:last-child .closing h3{font-size:12pt;margin-bottom:5px}
+
+.sheet:last-child .closing p{font-size:9pt}
+
+.sheet:last-child .sources{font-size:7.5pt;line-height:1.35}
+
+.sheet:last-child .folio{margin-top:8px;padding-top:7px}
+
+}
+
+
+</style>
+</head>
+<body>
+<a class="skip" href="#content">Skip to the product brief</a>
+<div class="toolbar"><p><a href="index.html">All products</a> · Technical product brief · coding-agent governor</p><button type="button" onclick="window.print()">Print / save PDF</button></div>
+<main id="content" class="document">
+
+<section class="sheet" aria-labelledby="title">
+<header class="masthead"><div class="wordmark"><svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="4" width="24" height="24" rx="5" fill="none" stroke="currentColor" stroke-width="3"/><path d="M10 16h12M16 10v12" stroke="currentColor" stroke-width="3" fill="none"/></svg>Agent Efficiency</div><div class="edition">Released<br>v0.2.2 · MIT</div></header>
+<div class="hero"><div><p class="audience">For developers who use a coding agent every day</p><h1 id="title">Fewer wasted turns. Proof a change was checked.</h1></div><p>Agent Efficiency is a plugin for Claude Code, Codex, and Cursor. It watches each session on your own machine, points out repeated work and repeated failures, and checks that a code change was tested before the agent says it is done.</p></div>
+<p class="lead">It makes no model calls and no network requests, keeps counts in one local SQLite file, and is written with only the Python standard library.</p>
+<div class="benefits"><div><h3>Spots wasted work</h3><p>Repeated commands, repeated failures, broad file scans, and edits with no test after them each trigger one short note in the session. Notes are capped at 3 per turn and 8 per session.</p></div><div><h3>Records test results as receipts</h3><p><code>agent-efficiency check</code> runs a test command you listed and saves the result tied to the exact commit and file contents. When the files change, the receipt is marked stale.</p></div><div><h3>Loads your own notes</h3><p>A vault is a git repository of short notes about your work. Each new session gets the notes that match its folder, in at most 9,000 characters.</p></div></div>
+<h2>Where it sits in a session</h2>
+<figure class="diagram wide">
+<svg viewBox="0 0 960 325" role="img" aria-labelledby="flow-title flow-desc"><title id="flow-title">Host lifecycle events feed one local runtime that answers with sparse guidance</title><desc id="flow-desc">Claude Code, Codex, and Cursor send lifecycle events through hooks. The runtime counts them, matches rules, and returns at most one short note. It also runs the test commands listed in agent-efficiency.toml, mints receipts, and loads vault notes at session start. Counts live in a local SQLite file.</desc><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="var(--accent)"/></marker><marker id="black-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="var(--ink)"/></marker></defs><rect x="2" y="2" width="956" height="207" rx="7" class="gray"/><text x="22" y="29" class="label">Your machine</text><text x="935" y="29" text-anchor="end" class="small muted">No model calls, no network</text><rect x="22" y="50" width="256" height="73" rx="5" class="box"/><text x="39" y="78" class="label">Host lifecycle events</text><text x="39" y="101" class="small">Claude Code · Codex · Cursor hooks</text><path d="M279 86H347" class="wire" marker-end="url(#arrow)"/><text x="312" y="75" text-anchor="middle" class="micro">then</text><rect x="351" y="50" width="319" height="137" rx="5" class="yellow"/><text x="371" y="78" class="label">Agent Efficiency runtime</text><text x="371" y="107" class="small">Count → match rules → one short note</text><text x="371" y="130" class="small">Run checks → mint receipts → load vault</text><text x="371" y="165" class="micro">Modes: off · observe · advise · guard</text><path d="M670 112H717" class="wire" marker-end="url(#arrow)"/><rect x="722" y="50" width="215" height="137" rx="5" class="dark"/><text x="739" y="79" class="label on-dark">What comes back</text><text x="739" y="109" class="small on-dark">Sparse guidance</text><text x="739" y="133" class="small on-dark">pass / fail / stale receipts</text><text x="739" y="157" class="small on-dark">Vault notes at start</text><rect x="22" y="146" width="256" height="41" rx="5" class="box"/><text x="39" y="172" class="small">agent-efficiency.toml: test commands</text><path d="M278 166H346" class="wire" marker-end="url(#arrow)"/><path d="M150 123V140" class="wire" marker-end="url(#arrow)"/><path d="M22 86H9V284H349" class="write" marker-end="url(#black-arrow)"/><rect x="38" y="267" width="222" height="25" fill="var(--bg)"/><text x="49" y="284" class="small">Never prompts, code, or output</text><rect x="351" y="250" width="319" height="64" rx="5" class="box"/><text x="510" y="277" text-anchor="middle" class="label">Local SQLite store</text><text x="510" y="299" text-anchor="middle" class="small">Counts, states, times, and one-way fingerprints only</text><path d="M488 190V246" class="wire" marker-end="url(#arrow)"/><path d="M533 248V192" class="wire" marker-end="url(#arrow)"/><text x="550" y="230" class="small">Read and write counters</text></svg>
+<ol class="mobile-flow"><li><strong>The host sends lifecycle events.</strong> Claude Code, Codex, and Cursor connect through their hook systems.</li><li><strong>The runtime counts and matches rules.</strong> Repeated commands, repeated failures, broad scans, and untested edits.</li><li><strong>It answers with at most one short note.</strong> Capped at 3 per turn and 8 per session; observe mode stays silent.</li><li><strong>Checks become receipts.</strong> A test result is tied to the commit and file contents it ran on.</li></ol>
+<figcaption>The three hosts share one runtime. Hooks deliver lifecycle events; the runtime answers with at most one note, and only when a rule matches.</figcaption>
+</figure>
+<div class="scope-note"><p><strong>A precise meaning for a passing receipt.</strong> The named command exited successfully on the exact commit and file contents recorded in the receipt. When any of those files change, the receipt is stale until the check runs again. A receipt proves the check ran. It does not judge whether the check was the right one.</p></div>
+<footer class="folio"><span>Agent Efficiency · Local coding-agent governor</span><span>How it fits · 1 / 3</span></footer>
+</section>
+
+<section class="sheet" aria-labelledby="example-title">
+<div class="section-heading"><h2 id="example-title">From a repeated failure to one note</h2><p>An agent that retries the same failing command five times burns a session without moving. The runtime notices the pattern and asks for a different approach, once.</p></div>
+<div class="example"><div class="example-header"><h3>Example: the one-line status</h3><span class="tag">Real output shape</span></div><pre>$agent-efficiency status
+Agent Efficiency: advise | turns 12 | tools 48 | failures 3 | nudges 1 | cost host metric unavailable.</pre><p class="caption">Typed as an ordinary chat message in Claude Code. Codex and Cursor expose the same runtime.</p></div>
+<figure class="diagram wide"><svg viewBox="0 0 960 208" role="img" aria-labelledby="proof-title proof-desc"><title id="proof-title">Session events are counted, rules select guidance, and the agent sees one note</title><desc id="proof-desc">Tool calls and results are counted without storing their text. Rules check repeat thresholds, the per-turn and per-session caps, and the mode. The agent receives one short note asking it to reconsider, or silence when nothing matches, and sees the receipt state when it finishes.</desc><rect x="2" y="2" width="270" height="186" rx="5" class="box"/><text x="20" y="31" class="label">A session's events</text><text x="20" y="64" class="small">tool call → result</text><text x="20" y="91" class="small">same command fails again</text><text x="20" y="118" class="small">broad scan of the tree</text><text x="20" y="145" class="small">edit with no test after it</text><text x="20" y="171" class="micro muted">Counted, never stored as text</text><rect x="340" y="2" width="280" height="186" rx="5" class="yellow"/><text x="358" y="31" class="label">Rules select guidance</text><text x="358" y="64" class="small">repeat threshold reached?</text><text x="358" y="91" class="small">cap: 3 notes per turn</text><text x="358" y="118" class="small">cap: 8 notes per session</text><text x="358" y="145" class="small">does the mode allow advice?</text><text x="358" y="171" class="micro muted">Guard needs project consent</text><rect x="690" y="2" width="268" height="186" rx="5" class="box"/><text x="708" y="31" class="label">What the agent sees</text><text x="708" y="64" class="small">one short note</text><text x="708" y="91" class="small">a request to reconsider the step</text><text x="708" y="118" class="small">silence when nothing matches</text><text x="708" y="145" class="small">receipt state at the finish</text><text x="708" y="171" class="micro muted">Observe mode stays silent</text><path d="M274 95H335" class="wire" marker-end="url(#arrow)"/><path d="M685 95H625" class="wire" marker-end="url(#arrow)"/></svg><ol class="mobile-flow"><li><strong>Events:</strong> tool calls, repeated failures, broad scans, and untested edits are counted, never stored as text.</li><li><strong>Rules:</strong> repeat thresholds, the caps of 3 notes per turn and 8 per session, and the current mode decide whether to speak.</li><li><strong>The agent sees:</strong> one short note, or silence, and the receipt state when it finishes.</li></ol><figcaption>Guard mode can hold the agent at the finish line until a receipt exists for the change. It is opt-in per project, because it changes what the agent is allowed to do.</figcaption></figure>
+<div class="outcomes"><div class="outcome"><h3>Check passed: a receipt is minted</h3><p>The test command ran on the current files and exited cleanly. The receipt records the commit, the file digests, and the time, so a reviewer can see whether the result still applies.</p></div><div class="outcome fail"><h3>Check stale or failed: the claim is not backed</h3><p>A file in the receipt's scope changed after the run, or the command failed. The status says so, and in guard mode the agent cannot declare the change done until a fresh check passes.</p></div></div>
+<div class="preservation"><h2>Measure whether it is worth its cost</h2><p>The reports guide describes a fair experiment: the same kind of work with the plugin in observe mode and in advise mode, compared on turns, tool calls, and failures. The data for that comparison is the same local store the plugin keeps anyway.</p></div>
+<div class="scope-note"><p><strong>Kept on purpose.</strong> It never stores prompts, code, commands, tool output, or transcripts. It does not call a model, does not reach the network, and does not change what your agent writes. Cursor works from a local plugin folder only, for now.</p></div>
+<footer class="folio"><span>Agent Efficiency · Local coding-agent governor</span><span>What it proves · 2 / 3</span></footer>
+</section>
+
+<section class="sheet" aria-labelledby="setup-title">
+<div class="section-heading"><h2 id="setup-title">Install it in one host, then the others</h2><p>The installer sets up the plugin and the terminal command and runs a doctor check. Claude Code is the shortest path. Codex needs two plugin commands and one hook approval.</p></div>
+<div class="two-col"><ol class="steps"><li><strong>Install from the release tag.</strong><p>You need Python 3.11 or newer and pipx or uv. Clone <code>v0.2.2</code>, run <code>install.sh</code>, and read the doctor line. If it prints FAILED, the lines below say what is wrong.</p></li><li><strong>List your checks.</strong><p>Put your project's test commands in <code>agent-efficiency.toml</code>. <code>agent-efficiency check</code> runs one and saves the receipt. The status line in your agent shows pass, fail, or stale.</p></li><li><strong>Pick a mode.</strong><p><code>advise</code> is the default. <code>observe</code> records without speaking. <code>guard</code> holds the finish line until a receipt exists and needs explicit project consent. <code>off</code> does nothing.</p></li></ol><div class="setup"><h3>Claude Code</h3><pre>git clone --branch v0.2.2 https://github.com/agent-efficiency/agent-efficiency.git
+cd agent-efficiency
+bash install.sh</pre><h3>By hand</h3><pre>claude plugin marketplace add "agent-efficiency/agent-efficiency#v0.2.2"
+claude plugin install agent-efficiency@agent-efficiency
+pipx install git+https://github.com/agent-efficiency/agent-efficiency@v0.2.2
+agent-efficiency doctor</pre><p class="caption">A ready setup ends with <code>Agent Efficiency doctor: OK</code> and the host's version line. Run <code>/reload-plugins</code> in an open Claude Code session or start a new one.</p></div></div>
+<figure class="diagram wide"><svg viewBox="0 0 960 137" role="img" aria-labelledby="evidence-title evidence-desc"><title id="evidence-title">A receipt ties a check to the code it ran on and goes stale when that code changes</title><desc id="evidence-desc">When a check runs, the command, commit, and file digests are recorded in a local receipt. When any of those files change, the receipt is marked stale. At review time the state reads pass, fail, or stale, next to the code it tested.</desc><rect x="2" y="2" width="290" height="112" rx="5" class="box"/><text x="19" y="29" class="label">A check runs</text><text x="19" y="55" class="small">Command, commit, and file digests</text><text x="19" y="74" class="small">recorded</text><text x="19" y="95" class="micro muted">Receipt stored locally</text><rect x="340" y="2" width="279" height="99" rx="5" class="yellow"/><text x="357" y="29" class="label">Files change</text><text x="357" y="55" class="small">Receipt marked stale automatically</text><text x="357" y="79" class="micro muted">Nothing is deleted</text><rect x="667" y="2" width="291" height="112" rx="5" class="dark"/><text x="684" y="29" class="label on-dark">Review time</text><text x="684" y="55" class="small on-dark">pass / fail / stale, with the code it</text><text x="684" y="74" class="small on-dark">tested</text><text x="684" y="95" class="micro on-dark">Evidence rather than a claim</text><path d="M295 51H335" class="wire" marker-end="url(#arrow)"/><path d="M622 51H662" class="wire" marker-end="url(#arrow)"/></svg><ol class="mobile-flow"><li>A check runs: the command, commit, and file digests are recorded in a local receipt.</li><li>Files change: the receipt is marked stale. Nothing is deleted.</li><li>At review time the state reads pass, fail, or stale, next to the code it tested.</li></ol><figcaption>A receipt ties a result to the code it ran on. Other local tools can read the receipts as evidence that a claimed check actually happened.</figcaption></figure>
+<table class="comparison"><caption>Current release: hosts and surfaces</caption><thead><tr><th scope="col">Host or surface</th><th scope="col">How it connects</th><th scope="col">Status</th></tr></thead><tbody><tr><td>Claude Code</td><td>Plugin from the marketplace; hooks on lifecycle events</td><td>Ready; the installer and doctor cover it</td></tr><tr><td>Codex</td><td>Two <code>codex plugin</code> commands and one approval in <code>/hooks</code></td><td>Ready; documented in the install guide</td></tr><tr><td>Cursor</td><td>Local plugin folder</td><td>Works from a local folder only, for now</td></tr><tr><td>Terminal</td><td><code>agent-efficiency</code> command: check, doctor, status, reports</td><td>Installed with pipx or uv</td></tr><tr><td>Vault</td><td>Git repository of short notes, matched by folder</td><td>Capped at 9,000 characters per session</td></tr></tbody></table>
+<p class="note">All data stays in one local folder, <code>~/.local/share/agent-efficiency</code> by default, created so that only you can read it. The privacy guide lists every field it stores.</p>
+<div class="closing"><h3>A focused first evaluation</h3><p>Install it in Claude Code on one project, list one test command, and work for a week in advise mode. Then read the report: how often it spoke, what it caught, and whether the receipts matched the commits you reviewed.</p></div>
+<div class="sources"><p><strong>Engineering basis.</strong> Prepared 7 November 2026 from release v0.2.2, published 6 November 2026, and repository revision <code>e32dd6e</code>.</p><p>Source documents: <a href="https://github.com/agent-efficiency/agent-efficiency">repository</a> · <a href="https://github.com/agent-efficiency/agent-efficiency/blob/v0.2.2/docs/install.md">install guide</a> · <a href="https://github.com/agent-efficiency/agent-efficiency/blob/v0.2.2/docs/privacy.md">privacy</a> · <a href="https://github.com/agent-efficiency/agent-efficiency/blob/v0.2.2/docs/architecture.md">architecture</a>. The table describes that release; it does not certify later changes.</p></div>
+<footer class="folio"><span>Agent Efficiency · v0.2.2</span><span>Adoption and evidence · 3 / 3</span></footer>
+</section>
+</main>
+</body>
+</html>

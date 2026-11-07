@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="How usabl checks the screens a code change touches in a real browser and returns one verdict. A technical product brief for teams that ship web UI with coding agents.">
+<title>usabl | Prove the change added no accessibility barrier</title>
+<style>
+:root{color-scheme:light;--bg:oklch(1 0 0);--ink:oklch(.23 .014 75);--muted:oklch(.44 .012 75);--brand:oklch(.87 .14 75);--surface:oklch(.96 0 0);--line:oklch(.81 .009 75);--accent:oklch(.37 .075 195);--good:oklch(.36 .08 155);--bad:oklch(.43 .15 28);--soft:oklch(.95 .025 155)}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--surface);color:var(--ink);font:16px/1.55 Cantarell,"Segoe UI",Arial,sans-serif}
+a{color:var(--accent);text-underline-offset:3px}
+a:hover{text-decoration-thickness:2px}
+a:focus-visible,button:focus-visible{outline:3px solid var(--accent);outline-offset:5px}
+.skip{position:absolute;left:16px;top:-100px;background:white;padding:10px;z-index:2}
+.skip:focus{top:10px}
+.toolbar{max-width:1160px;margin:auto;display:flex;justify-content:space-between;gap:20px;align-items:center;padding:20px 32px;font-size:14px}
+.toolbar p{margin:0}
+button{background:var(--ink);color:var(--bg);border:0;padding:10px 18px;border-radius:4px;font:inherit;font-weight:700;cursor:pointer}
+.document{max-width:1160px;margin:0 auto 40px;background:var(--bg)}
+.sheet{padding:40px 52px 32px}
+.sheet+.sheet{border-top:10px solid var(--surface)}
+.masthead,.folio{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.wordmark{font-size:30px;font-weight:800;letter-spacing:-.035em;display:flex;align-items:center;gap:10px}
+.mark{width:31px;height:31px}
+.edition{font-size:13px;color:var(--muted);text-align:right}
+.hero{background:var(--brand);padding:36px 38px;margin:27px 0 30px;display:grid;grid-template-columns:1.55fr 1fr;gap:30px;align-items:end}
+.audience{font-size:14px;font-weight:700;margin:0 0 13px}
+h1{font-size:clamp(36px,4.7vw,58px);line-height:1.04;letter-spacing:-.035em;margin:0;max-width:15ch}
+h1,h2,h3{text-wrap:balance}
+h2{font-size:28px;line-height:1.18;letter-spacing:-.02em;margin:0 0 14px}
+h3{font-size:18px;line-height:1.3;margin:0 0 8px}
+p{margin:0 0 14px;text-wrap:pretty;max-width:75ch}
+.hero p:last-child{margin:0;font-size:18px;line-height:1.5}
+.lead{font-size:19px;line-height:1.5;max-width:72ch}
+.benefits{display:grid;grid-template-columns:1fr 1fr 1fr;gap:26px;margin:25px 0 28px}
+.benefits p{font-size:15px;margin:0}
+.benefits h3{font-size:17px}
+.diagram{margin:20px 0 18px}
+.diagram svg{display:block;width:100%;height:auto}
+.diagram text{font-family:Cantarell,"Segoe UI",Arial,sans-serif;fill:var(--ink)}
+.diagram .label{font-size:16px;font-weight:700}
+.diagram .small{font-size:13px}
+.diagram .micro{font-size:12px}
+.diagram .muted{fill:var(--muted)}
+.diagram .on-dark{fill:var(--bg)}
+.diagram .box{fill:var(--bg);stroke:var(--line);stroke-width:1.5}
+.diagram .gray{fill:var(--surface)}
+.diagram .yellow{fill:var(--brand)}
+.diagram .dark{fill:var(--accent)}
+.diagram .wire{stroke:var(--accent);stroke-width:2;fill:none}
+.diagram .write{stroke:var(--ink);stroke-width:2;fill:none}
+.diagram .dash{stroke-dasharray:5 4}
+figcaption,.caption{font-size:13px;color:var(--muted);margin-top:9px}
+.scope-note{background:var(--surface);padding:16px 20px;font-size:15px;margin-top:22px}
+.scope-note p{margin:0}
+.folio{border-top:1px solid var(--line);margin-top:28px;padding-top:13px;color:var(--muted);font-size:12px}
+.folio span:last-child{white-space:nowrap}
+.section-heading{margin:12px 0 24px}
+.section-heading p{font-size:17px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:34px}
+.example{background:var(--surface);padding:22px 25px;margin:20px 0}
+.example-header{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:12px}
+.tag{font-size:12px;font-weight:700;padding:4px 9px;background:var(--bg);border:1px solid var(--line);border-radius:3px}
+.example-header h3{margin:0}
+pre{font:13px/1.65 "Adwaita Mono",Consolas,monospace;margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+code{font-family:"Adwaita Mono",Consolas,monospace;font-size:.88em;overflow-wrap:anywhere}
+.outcomes{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:20px 0 26px}
+.outcome{border-top:3px solid var(--good);padding-top:12px}
+.outcome.fail{border-color:var(--bad)}
+.outcome h3{color:var(--good)}
+.outcome.fail h3{color:var(--bad)}
+.outcome p{font-size:15px;margin:0}
+.comparison{width:100%;border-collapse:collapse;font-size:14px;margin:18px 0 20px}
+.comparison caption{text-align:left;font-size:18px;font-weight:700;margin-bottom:10px}
+.comparison th{text-align:left;font-size:13px;background:var(--surface);padding:10px 12px}
+.comparison td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+.comparison th:first-child{width:22%}
+.comparison td:first-child{font-weight:700}
+.note{font-size:14px;color:var(--muted)}
+.steps{padding:0;margin:0;list-style:none;counter-reset:step}
+.steps li{counter-increment:step;position:relative;padding-left:38px;margin-bottom:17px}
+.steps li:before{content:counter(step);position:absolute;left:0;top:0;width:25px;height:25px;border-radius:50%;background:var(--brand);text-align:center;font-weight:700;line-height:25px}
+.steps strong{display:block}
+.steps p{font-size:14px;margin:3px 0 0}
+.setup{background:var(--surface);padding:20px 23px}
+.setup h3{font-size:15px}
+.setup pre+ h3{margin-top:17px}
+.closing{background:var(--brand);padding:21px 25px;margin:24px 0 20px}
+.closing h3{font-size:21px}
+.closing p{margin:0;font-size:15px}
+.sources{font-size:12px;color:var(--muted)}
+.sources p{margin-bottom:6px}
+.sources a{color:inherit}
+.mobile-flow{display:none}
+.preservation{margin-top:22px}
+.preservation p{font-size:15px}
+.preservation strong{color:var(--ink)}
+
+@media screen and (max-width:760px){.toolbar{padding:16px 20px}
+.toolbar p{max-width:21ch}
+.sheet{padding:28px 22px}
+.hero{padding:26px;grid-template-columns:1fr;gap:22px;margin-top:22px}
+.hero p:last-child{font-size:17px}
+.benefits{grid-template-columns:1fr;gap:18px}
+.two-col{grid-template-columns:1fr;gap:24px}
+.edition{max-width:135px}
+.outcomes{grid-template-columns:1fr}
+.diagram.wide svg{display:none}
+.mobile-flow{display:block;margin:0;padding:20px 20px 20px 40px;background:var(--surface)}
+.mobile-flow li{margin-bottom:12px;font-size:15px}
+.mobile-flow li:last-child{margin:0}
+.comparison th,.comparison td{padding:9px 6px;font-size:13px}
+.example{padding:18px}
+.example-header{align-items:flex-start;flex-direction:column}
+.folio{font-size:11px}
+.wordmark{font-size:27px}
+.section-heading{margin-top:0}
+h2{font-size:26px}
+}
+
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}
+}
+
+@page{size:A4;margin:12mm}
+
+@media print{body{background:white;font-size:10pt;line-height:1.4;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.toolbar,.skip{display:none}
+.document{width:auto;max-width:none;margin:0}
+.sheet{padding:0;break-after:page}
+.sheet:last-child{break-after:auto}
+.sheet+.sheet{border:0}
+.wordmark{font-size:22pt}
+.edition{font-size:9pt}
+.hero{margin:16px 0 19px;padding:24px;gap:22px;grid-template-columns:1.4fr 1fr}
+h1{font-size:32pt}
+.hero p:last-child{font-size:12pt}
+.audience{font-size:9pt}
+h2{font-size:19pt}
+h3{font-size:12pt}
+.lead{font-size:12pt}
+.benefits{margin:17px 0;gap:18px}
+.benefits h3{font-size:11pt}
+.benefits p,.scope-note,.outcome p,.preservation p{font-size:10pt}
+.diagram{margin:14px 0}
+.diagram.wide svg{display:block}
+.mobile-flow{display:none}
+.scope-note{margin-top:15px;padding:12px 15px}
+.folio{margin-top:20px;padding-top:9px;font-size:8pt}
+.section-heading{margin:10px 0 18px}
+.section-heading p{font-size:11pt}
+.example{margin:14px 0;padding:15px 19px}
+.example-header{margin-bottom:8px}
+pre{font-size:8.5pt;line-height:1.55}
+.outcomes{margin:16px 0 20px}
+.comparison{font-size:9pt;margin:14px 0}
+.comparison th,.comparison td{padding:8px;font-size:9pt}
+.note,.steps p{font-size:9pt}
+.two-col{gap:24px}
+.steps li{margin-bottom:13px}
+.setup{padding:17px}
+.closing{margin:18px 0 15px;padding:16px 20px}
+.closing h3{font-size:14pt}
+.closing p{font-size:10pt}
+.sources{font-size:8pt}
+figcaption,.caption{font-size:8pt}
+.preservation{margin-top:16px}
+a{color:inherit;text-decoration:none}
+.diagram,.outcome,.setup,.comparison tr,.closing{break-inside:avoid}
+}
+
+@media print{
+.sheet:last-child .section-heading{margin:0 0 12px}
+
+.sheet:last-child .section-heading p{font-size:10pt;margin-bottom:8px}
+
+.sheet:last-child .steps p{font-size:8.5pt;line-height:1.4}
+
+.sheet:last-child .steps li{margin-bottom:10px}
+
+.sheet:last-child .setup{padding:13px}
+
+.sheet:last-child .setup pre{font-size:8pt;line-height:1.45}
+
+.sheet:last-child .setup pre+h3{margin-top:12px}
+
+.sheet:last-child .diagram{margin:10px 0}
+
+.sheet:last-child .comparison{margin:10px 0}
+
+.sheet:last-child .comparison td,.sheet:last-child .comparison th{padding:4px 8px;font-size:8.5pt}
+
+.sheet:last-child .note{font-size:8.5pt;margin-bottom:10px}
+
+.sheet:last-child .closing{margin:8px 0;padding:10px 16px}
+
+.sheet:last-child .closing h3{font-size:12pt;margin-bottom:5px}
+
+.sheet:last-child .closing p{font-size:9pt}
+
+.sheet:last-child .sources{font-size:7.5pt;line-height:1.35}
+
+.sheet:last-child .folio{margin-top:8px;padding-top:7px}
+
+}
+
+
+</style>
+</head>
+<body>
+<a class="skip" href="#content">Skip to the product brief</a>
+<div class="toolbar"><p><a href="index.html">All products</a> · Technical product brief · accessibility gate</p><button type="button" onclick="window.print()">Print / save PDF</button></div>
+<main id="content" class="document">
+
+<section class="sheet" aria-labelledby="title">
+<header class="masthead"><div class="wordmark"><svg class="mark" viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="4" width="24" height="24" rx="5" fill="none" stroke="currentColor" stroke-width="3"/><path d="M10 16h12M16 10v12" stroke="currentColor" stroke-width="3" fill="none"/></svg>usabl</div><div class="edition">Early release<br>v0.2.2, not on npm yet</div></header>
+<div class="hero"><div><p class="audience">For teams that ship web UI with coding agents</p><h1 id="title">Prove the change added no accessibility barrier.</h1></div><p>usabl checks the screens a code change touches, in a real browser, while the code is being written. It returns one verdict and says what it could not check.</p></div>
+<p class="lead">Add an accessibility gate to the places you already work: the terminal, the dev server, the assistant's Stop hook, the pull request, and your Playwright tests. One engine runs behind all of them.</p>
+<div class="benefits"><div><h3>Only new barriers block</h3><p>Barriers already in the app are recorded as an evidence floor. The gate blocks a new barrier above that floor, so you can adopt it without fixing everything first.</p></div><div><h3>Repeatable checks, no model</h3><p>Results come from axe-core, a PatternFly rulepack, and a keyboard walk in Chromium. An AI assistant can fix a barrier. It does not decide the result.</p></div><div><h3>A verdict with a receipt</h3><p>A verified run mints a receipt tied to the source tree, the policy hash, and the engine and scanner versions, so it can be re-checked later.</p></div></div>
+<h2>Where usabl fits in your workflow</h2>
+<figure class="diagram wide">
+<svg viewBox="0 0 960 325" role="img" aria-labelledby="flow-title flow-desc"><title id="flow-title">A code change is scanned in a real browser and gets one verdict</title><desc id="flow-desc">Changed UI files are mapped to screens. usabl scans those screens in Chromium with three rule layers, compares the result with the recorded evidence floor, and returns one verdict. The same engine runs in the terminal, the dev-server overlay, assistant stop hooks, CI, and Playwright tests.</desc><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="var(--accent)"/></marker><marker id="black-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="var(--ink)"/></marker></defs><rect x="2" y="2" width="956" height="207" rx="7" class="gray"/><text x="22" y="29" class="label">Your development loop</text><text x="935" y="29" text-anchor="end" class="small muted">Same engine in every surface</text><rect x="22" y="50" width="256" height="73" rx="5" class="box"/><text x="39" y="78" class="label">A code change</text><text x="39" y="101" class="small">Changed UI files, mapped to screens</text><path d="M279 86H347" class="wire" marker-end="url(#arrow)"/><text x="312" y="75" text-anchor="middle" class="micro">then</text><rect x="351" y="50" width="319" height="137" rx="5" class="yellow"/><text x="371" y="78" class="label">usabl check</text><text x="371" y="107" class="small">Map files to screens → scan in Chromium</text><text x="371" y="130" class="small">Compare with the floor → decide once</text><text x="371" y="165" class="micro">Three rule layers. No model call.</text><path d="M670 112H717" class="wire" marker-end="url(#arrow)"/><rect x="722" y="50" width="215" height="137" rx="5" class="dark"/><text x="739" y="79" class="label on-dark">One verdict</text><text x="739" y="109" class="small on-dark">verified · regression</text><text x="739" y="133" class="small on-dark">not covered · approval</text><text x="739" y="157" class="small on-dark">Receipt when verified</text><rect x="22" y="146" width="256" height="41" rx="5" class="box"/><text x="39" y="172" class="small">Policy read from the trusted base branch</text><path d="M278 166H346" class="wire" marker-end="url(#arrow)"/><path d="M150 123V140" class="wire" marker-end="url(#arrow)"/><path d="M22 86H9V284H349" class="write" marker-end="url(#black-arrow)"/><rect x="38" y="267" width="194" height="25" fill="var(--bg)"/><text x="49" y="284" class="small">Screens the change touched</text><rect x="351" y="250" width="319" height="64" rx="5" class="box"/><text x="510" y="277" text-anchor="middle" class="label">Your running app</text><text x="510" y="299" text-anchor="middle" class="small">Dev server, built app in CI, or a saved login session</text><path d="M488 190V246" class="wire" marker-end="url(#arrow)"/><path d="M533 248V192" class="wire" marker-end="url(#arrow)"/><text x="550" y="230" class="small">Scan / observed barriers</text></svg>
+<ol class="mobile-flow"><li><strong>The change touches UI files.</strong> usabl maps them to the screens they render.</li><li><strong>The engine scans those screens in a real Chromium.</strong> axe-core, PatternFly rules, and a keyboard walk.</li><li><strong>It compares the result with the recorded evidence floor.</strong> Only a new barrier above the floor blocks.</li><li><strong>One verdict comes back, with a receipt when verified.</strong> A run with no verdict is never counted as a pass.</li></ol>
+<figcaption>usabl runs where the code is written: the terminal, the Vite or webpack overlay, a Claude Code or Cursor stop hook, a GitHub Actions check, and Playwright tests. The gate computes the verdict. The overlay only shows it.</figcaption>
+</figure>
+<div class="scope-note"><p><strong>A precise meaning for verified.</strong> On the screens usabl checked, the change added no new barrier a machine can detect, compared with the barriers already recorded. A run that checked nothing, or could not finish, returns no verdict, and no verdict is never counted as a pass. Verified does not mean the app is accessible or compliant.</p></div>
+<footer class="folio"><span>usabl · Accessibility proof engine</span><span>How it fits · 1 / 3</span></footer>
+</section>
+
+<section class="sheet" aria-labelledby="example-title">
+<div class="section-heading"><h2 id="example-title">From a changed component to a verdict</h2><p>A modal that loses its focus trap passes a visual review and breaks keyboard users. usabl sees the change, scans the screen, and refuses to call the change done.</p></div>
+<div class="example"><div class="example-header"><h3>Example: what a blocking run reports</h3><span class="tag">Illustrative output</span></div><pre>npx usabl check
+Screens checked: 1 of 1 mapped (settings)
+New barriers: 1
+  settings › dialog: focus is not trapped (keyboard walk)
+Verdict: regression (exit 1)
+Not covered: none</pre><p class="caption">The shape is illustrative. The real report names the screen, the rule, the element, and the layer that found it.</p></div>
+<figure class="diagram wide"><svg viewBox="0 0 960 208" role="img" aria-labelledby="proof-title proof-desc"><title id="proof-title">Changed files become a scan, and the scan becomes one verdict</title><desc id="proof-desc">The changed file is mapped to the settings screen and the policy is read from main. The gate runs axe-core, PatternFly rules, and the keyboard walk, asks whether a new barrier appeared above the floor, and returns regression, verified, not covered, or approval required.</desc><rect x="2" y="2" width="270" height="186" rx="5" class="box"/><text x="20" y="31" class="label">Changed files</text><text x="20" y="64" class="small">src/SettingsDialog.tsx</text><text x="20" y="91" class="small">Mapped to: /settings</text><text x="20" y="118" class="small">Policy read from main</text><text x="20" y="145" class="small">Floor: 3 known barriers</text><text x="20" y="171" class="micro muted">Coverage identity is recorded</text><rect x="340" y="2" width="280" height="186" rx="5" class="yellow"/><text x="358" y="31" class="label">The gate decides once</text><text x="358" y="64" class="small">axe-core rules</text><text x="358" y="91" class="small">PatternFly composition rules</text><text x="358" y="118" class="small">Keyboard and announcement walk</text><text x="358" y="145" class="small">New barrier above the floor?</text><text x="358" y="171" class="micro muted">Same decision in every surface</text><rect x="690" y="2" width="268" height="186" rx="5" class="box"/><text x="708" y="31" class="label">The result</text><text x="708" y="64" class="small">regression: blocks</text><text x="708" y="91" class="small">verified: receipt minted</text><text x="708" y="118" class="small">not covered: a gap, said plainly</text><text x="708" y="145" class="small">approval required: policy edit</text><text x="708" y="171" class="micro muted">Words, never colors alone</text><path d="M274 95H335" class="wire" marker-end="url(#arrow)"/><path d="M685 95H625" class="wire" marker-end="url(#arrow)"/></svg><ol class="mobile-flow"><li><strong>Changed files:</strong> one component, mapped to the settings screen, policy read from main, three known barriers on the floor.</li><li><strong>The gate decides once:</strong> axe-core, PatternFly rules, and the keyboard walk run; the question is whether a new barrier appeared above the floor.</li><li><strong>The result:</strong> regression blocks, verified mints a receipt, not covered is a stated gap, approval required means policy itself changed.</li></ol><figcaption>The floor records known barriers by screen, rule, and element. A waiver carries an owner, an approver, a reason, and an expiry date, and a waived barrier stays visible in the result.</figcaption></figure>
+<div class="outcomes"><div class="outcome"><h3>Verified: no new barrier on the checked screens</h3><p>Every mapped screen rendered and scanned, nothing new appeared above the floor, and no coverage gap was found. A receipt records the tree, policy, and versions.</p></div><div class="outcome fail"><h3>Regression or not covered: the change cannot be called done</h3><p>A new barrier blocks with exit code 1. A screen usabl could not check is reported as not covered rather than guessed. The Stop hook, the required CI check, or your own script turns either into a block.</p></div></div>
+<div class="preservation"><h2>Also checks the docs, and keeps the debt shrinking</h2><p>With a <code>usabl.docs.json</code> manifest, the same run scans the product's published documentation pages with a docs rule profile and ends in one verdict or none.</p><p>When two scans of main confirm a fix, its slot in the floor closes so a new barrier cannot take it. <code>usabl debt</code> lists what remains and how old it is.</p></div>
+<div class="scope-note"><p><strong>Keep expert judgment with your team.</strong> usabl mechanically checks 21 of the 55 WCAG 2.2 Level A and AA criteria. It does not claim compliance, replace audits or testing with people who use assistive technology, or judge whether alternative text is useful. The virtual screen reader check is built and tested but is not part of the result yet.</p></div>
+<footer class="folio"><span>usabl · Accessibility proof engine</span><span>What it proves · 2 / 3</span></footer>
+</section>
+
+<section class="sheet" aria-labelledby="setup-title">
+<div class="section-heading"><h2 id="setup-title">Put the gate where the code is written</h2><p>Build the release from source next to your app, draft the configuration from your code, record the barriers already there, then install the surfaces you use.</p></div>
+<div class="two-col"><ol class="steps"><li><strong>Build from a release tag.</strong><p>usabl needs Node.js 22 or later and is not on npm yet. Clone the <code>v0.2.2</code> tag, build it, install Chromium for Playwright, and add it to your app as a file dependency.</p></li><li><strong>Draft, review, commit.</strong><p><code>usabl init</code> drafts the config and route map from your code. <code>usabl baseline</code> scans every mapped screen twice to draft the evidence floor. Commit each file before the next step: usabl does not trust policy files with uncommitted changes.</p></li><li><strong>Install the surfaces you use.</strong><p>One command each for the dev-server overlay, the Claude Code Stop hook and skills, the Cursor hook, and the GitHub Actions gate. <code>usabl doctor</code> reports what is set up and what is missing.</p></li></ol><div class="setup"><h3>Build and link</h3><pre>git clone --branch v0.2.2 https://github.com/usabl-dev/usabl.git
+cd usabl &amp;&amp; npm ci &amp;&amp; npm run build
+npx playwright install chromium
+cd ../your-app &amp;&amp; npm install --save-dev file:../usabl</pre><h3>First run</h3><pre>npx usabl init
+npx usabl baseline
+npx usabl check
+npx usabl install --ci</pre><p class="caption">In CI the pull request is built in a job with no secrets and judged in a separate job, so the app must build to static files and <code>appBaseUrl</code> must be a loopback address with a port.</p></div></div>
+<figure class="diagram wide"><svg viewBox="0 0 960 137" role="img" aria-labelledby="evidence-title evidence-desc"><title id="evidence-title">A receipt ties a verified run to the code and policy it checked</title><desc id="evidence-desc">A verified run mints a receipt with the source tree, policy hash, and engine and scanner versions. It can be re-checked later against the same inputs. In CI, policy is read from the trusted base branch so a change cannot weaken its own rules.</desc><rect x="2" y="2" width="290" height="112" rx="5" class="box"/><text x="19" y="29" class="label">A verified run mints a receipt</text><text x="19" y="55" class="small">Source tree, policy hash, engine and</text><text x="19" y="74" class="small">scanner versions</text><text x="19" y="95" class="micro muted">Stored with the run</text><rect x="340" y="2" width="279" height="112" rx="5" class="yellow"/><text x="357" y="29" class="label">Re-check it later</text><text x="357" y="55" class="small">Same tree and policy give the same</text><text x="357" y="74" class="small">verdict</text><text x="357" y="95" class="micro muted">The gate recomputes; it does not trust</text><rect x="667" y="2" width="291" height="99" rx="5" class="dark"/><text x="684" y="29" class="label on-dark">CI reads policy from main</text><text x="684" y="55" class="small on-dark">A change cannot weaken its own rules</text><text x="684" y="79" class="micro on-dark">Required check: usabl-required</text><path d="M295 51H335" class="wire" marker-end="url(#arrow)"/><path d="M622 51H662" class="wire" marker-end="url(#arrow)"/></svg><ol class="mobile-flow"><li>A verified run mints a receipt with the source tree, policy hash, and engine and scanner versions.</li><li>Re-check it later: the same tree and policy give the same verdict.</li><li>In CI, policy is read from main, so a change cannot weaken the rules it is checked against.</li></ol><figcaption>A pull request cannot grade itself: policy is read from the trusted base branch, so a local run and a CI run can differ when local policy files differ from the base.</figcaption></figure>
+<table class="comparison"><caption>Current build: what is proven and where</caption><thead><tr><th scope="col">Surface</th><th scope="col">What it does</th><th scope="col">Status</th></tr></thead><tbody><tr><td>Terminal (<code>usabl check</code>)</td><td>Maps, scans, decides, mints the receipt</td><td>Unit and Chromium integration tests in CI on every pull request</td></tr><tr><td>Dev-server overlay</td><td>Shows the gate's result inside the page; Vite and webpack</td><td>Advisory only; it never mints a verdict</td></tr><tr><td>Assistant Stop hooks</td><td>Claude Code and Cursor block the first stop on a blocking verdict</td><td>One-use bypass available to the user</td></tr><tr><td>GitHub Actions gate</td><td>Builds without secrets, judges in a separate job, keeps debt history</td><td>Written by <code>usabl install --ci</code></td></tr><tr><td>Playwright <code>checkPage</code></td><td>Same providers on one live page</td><td>No floor or waivers, so its verdict can differ from <code>usabl check</code></td></tr><tr><td>Full proof loop</td><td>Break, block, repair, verify</td><td>Run on the usabl-app sample, a PatternFly 6 app with known barriers</td></tr></tbody></table>
+<p class="note">Route discovery is built for React apps. The overlay supports Vite and webpack-dev-server; rspack and Next.js are not supported yet. Screens behind a login need a saved session from <code>usabl session</code>. usabl has not been load tested against a large fleet of applications.</p>
+<div class="closing"><h3>A focused first evaluation</h3><p>Point usabl at one React app with a known barrier, or at the usabl-app sample. Record the floor, break a modal's focus trap, watch the gate block, repair it, and read the receipt with the people who approve accessibility.</p></div>
+<div class="sources"><p><strong>Engineering basis.</strong> Prepared 7 November 2026 from the public repository at revision <code>baa2c50</code>, version 0.2.2. Winner of the Red Hat Innovation Days 2026 Global AI Challenge, Challenge 4, Web Accessibility at Scale.</p><p>Source documents: <a href="https://github.com/usabl-dev/usabl">repository</a> · <a href="https://usabl-dev.github.io/usabl/">walkthrough</a> · <a href="https://usabl-dev.github.io/usabl/how-usabl-works.html">how usabl works</a> · <a href="https://usabl-dev.github.io/usabl/code-walkthrough.html">code walkthrough</a>. The status table describes that revision; it does not certify later changes.</p></div>
+<footer class="folio"><span>usabl · Early release</span><span>Adoption and evidence · 3 / 3</span></footer>
+</section>
+</main>
+</body>
+</html>

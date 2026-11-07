@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="How Siglum turns CI evidence into a recomputed, signed merge verdict: the trust boundary, the order of enforcement, the attestation, the two tiers, and what the design does not defend against.">
+<meta name="color-scheme" content="light">
+<title>How Siglum works</title>
+<style>
+:root {
+  --ink: oklch(0.25 0.025 270);
+  --muted: oklch(0.46 0.025 270);
+  --accent: oklch(0.45 0.18 270);
+  --accent-soft: oklch(0.96 0.018 270);
+  --context: oklch(0.43 0.085 175);
+  --context-soft: oklch(0.96 0.025 175);
+  --caution: oklch(0.43 0.10 60);
+  --caution-soft: oklch(0.97 0.025 75);
+  --line: oklch(0.83 0.02 270);
+  --surface: oklch(0.98 0.005 270);
+  --white: oklch(1 0 0);
+  font-family: "Noto Sans", "Segoe UI", Arial, sans-serif;
+  color: var(--ink); background: var(--white); font-synthesis: none;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+body { margin: 0; font-size: 16px; line-height: 1.65; }
+a { color: var(--accent); text-underline-offset: 3px; }
+a:hover { text-decoration-thickness: 2px; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+.skip { position: absolute; top: -100px; left: 20px; padding: 10px 18px; background: var(--white); z-index: 2; }
+.skip:focus { top: 10px; }
+.masthead { border-bottom: 1px solid var(--line); }
+.masthead-inner { max-width: 1240px; margin: auto; padding: 20px 32px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.identity { display: flex; align-items: center; gap: 12px; font-weight: 700; }
+.mark { display: grid; place-items: center; width: 36px; height: 36px; background: var(--accent); color: var(--white); border-radius: 6px; font-size: 14px; }
+.edition { font-size: 14px; color: var(--muted); font-weight: 400; }
+.toolbar-links { margin: 0; font-size: 14px; color: var(--muted); white-space: nowrap; }
+.layout { display: grid; grid-template-columns: 196px minmax(0, 1fr); gap: 56px; max-width: 1240px; margin: auto; padding: 48px 32px 64px; }
+.contents { align-self: start; position: sticky; top: 24px; }
+.contents h2 { margin: 0 0 10px; font-size: 15px; line-height: 1.4; }
+.contents ol { list-style: none; padding: 0; margin: 0; }
+.contents li { margin: 0; }
+.contents a { display: block; padding: 7px 10px; margin: 0 -10px; font-size: 14px; text-decoration: none; border-radius: 5px; color: var(--muted); }
+.contents a:hover { color: var(--accent); background: var(--accent-soft); }
+.contents .small { margin-top: 28px; }
+main, article { min-width: 0; }
+h1, h2, h3 { line-height: 1.2; text-wrap: balance; }
+h1 { font-size: clamp(2.25rem, 4.5vw, 3.3rem); letter-spacing: -0.025em; font-weight: 750; margin: 12px 0 22px; max-width: 20ch; }
+h2 { font-size: 1.9rem; letter-spacing: -0.02em; margin: 0 0 20px; }
+h3 { font-size: 1.15rem; margin: 30px 0 12px; }
+p, li, dd { text-wrap: pretty; }
+p { max-width: 73ch; margin: 0 0 18px; }
+ul, ol { padding-left: 23px; }
+li { margin-bottom: 7px; }
+.lead { font-size: 1.14rem; line-height: 1.65; max-width: 64ch; }
+.metadata { display: flex; flex-wrap: wrap; gap: 8px 18px; color: var(--muted); font-size: 14px; }
+.small { font-size: 14px; line-height: 1.6; color: var(--muted); }
+section { margin-top: 64px; padding-top: 10px; scroll-margin-top: 24px; }
+.definition { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 9px 20px; margin: 25px 0; }
+.definition dt { font-weight: 700; }
+.definition dd { margin: 0; max-width: 74ch; }
+.note { padding: 20px 24px; margin: 24px 0; background: var(--accent-soft); border-radius: 8px; }
+.note p { margin: 0; }
+.note.caution { background: var(--caution-soft); color: var(--caution); }
+figure { margin: 28px 0; }
+.diagram { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 12px; }
+.diagram svg { display: block; width: 100%; min-width: 700px; height: auto; }
+figcaption { margin-top: 12px; color: var(--muted); font-size: 14px; line-height: 1.6; max-width: 78ch; }
+svg text { font-family: "Noto Sans", "Segoe UI", Arial, sans-serif; font-size: 17px; fill: var(--ink); }
+svg .label { font-size: 14px; fill: var(--muted); }
+svg .node-title { font-size: 18px; font-weight: 700; }
+svg .box { fill: var(--white); stroke: var(--line); stroke-width: 1.4; rx: 8px; }
+svg .accent-box { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.4; rx: 8px; }
+svg .context-box { fill: var(--context-soft); stroke: var(--context); stroke-width: 1.4; rx: 8px; }
+svg .caution-box { fill: var(--caution-soft); stroke: var(--caution); stroke-width: 1.4; rx: 8px; }
+svg .wire { fill: none; stroke: var(--accent); stroke-width: 2; }
+.table-wrap { max-width: 100%; overflow-x: auto; margin: 24px 0; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; text-align: left; }
+caption { text-align: left; font-weight: 700; padding-bottom: 10px; }
+th, td { vertical-align: top; border-bottom: 1px solid var(--line); padding: 13px 12px; }
+th { font-weight: 700; background: var(--surface); }
+td:first-child { font-weight: 600; }
+.two-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; }
+.two-columns h3 { margin-top: 12px; }
+code, pre { font-family: "Adwaita Mono", "Cascadia Code", Consolas, monospace; font-size: 0.88em; }
+code { overflow-wrap: anywhere; }
+pre { background: var(--surface); padding: 20px 22px; border: 1px solid var(--line); border-radius: 8px; overflow: auto; line-height: 1.65; }
+pre code { font-size: 1em; overflow-wrap: normal; }
+footer { margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+@media (max-width: 1000px) {
+  .layout { grid-template-columns: 160px minmax(0, 1fr); gap: 30px; padding-inline: 24px; }
+}
+@media (max-width: 760px) {
+  .masthead-inner { padding: 16px 20px; flex-wrap: wrap; }
+  .identity .edition { display: none; }
+  .layout { display: block; padding: 24px 20px 40px; }
+  .contents { position: static; margin-bottom: 36px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+  .contents ol { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+  .contents a { margin: 0; padding: 5px 0; }
+  .contents .small { display: none; }
+  h1 { font-size: clamp(2.1rem, 7vw, 3rem); }
+  h2 { font-size: 1.65rem; }
+  section { margin-top: 46px; }
+  .two-columns { grid-template-columns: 1fr; gap: 8px; }
+  .definition { grid-template-columns: 110px minmax(0, 1fr); gap: 10px 12px; }
+  .note { padding: 18px; }
+  .diagram { padding: 8px; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+@media print {
+  @page { size: A4; margin: 16mm; }
+  body { font-size: 10pt; line-height: 1.5; }
+  .skip, .contents, .toolbar-links { display: none !important; }
+  .masthead-inner { padding: 0 0 10pt; }
+  .layout { display: block; padding: 20pt 0 0; max-width: none; }
+  h1 { font-size: 30pt; max-width: none; }
+  h2 { font-size: 20pt; }
+  h3 { font-size: 12pt; }
+  .lead { font-size: 12pt; }
+  section { margin-top: 28pt; padding-top: 0; }
+  h2, h3 { break-after: avoid; }
+  figure, pre, .note, tr { break-inside: avoid; }
+  p, li { orphans: 3; widows: 3; }
+  .diagram, .table-wrap { overflow: visible; }
+  .diagram svg, table { min-width: 0 !important; width: 100%; }
+  .note, .diagram, th, .mark { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+  a { color: var(--ink); }
+  footer { font-size: 8pt; }
+}
+
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the document</a>
+<div class="masthead"><div class="masthead-inner">
+  <div class="identity"><span class="mark" aria-hidden="true">SG</span><span>Siglum</span><span class="edition">How it works · v0.1, revision aced206</span></div>
+  <p class="toolbar-links"><a href="index.html">All products</a> · <a href="siglum.html">Product brief</a></p>
+</div></div>
+<div class="layout">
+<nav class="contents" aria-label="In this document"><h2>In this document</h2><ol><li><a href="#system">The whole system</a></li><li><a href="#verdict">Evidence becomes a verdict</a></li><li><a href="#order">The order of enforcement</a></li><li><a href="#attestation">What the attestation contains</a></li><li><a href="#tiers">Two tiers, one core</a></li><li><a href="#boundary">What Siglum does not defend against</a></li><li><a href="#status">Status discipline</a></li><li><a href="#using">Using it</a></li><li><a href="#source">Source map</a></li></ol>
+<p class="small">Each defense is marked as unit-tested or as exercised only in a live run, matching the repository's own status ledger.</p></nav>
+<main id="main"><article>
+<header><div class="metadata"><span>Technical guide</span><span>Prepared 7 November 2026</span><span>Source: README and threat model at revision aced206</span></div><h1>How Siglum works</h1><p class="lead">Siglum sits on top of the validators you already run and decides whether their evidence is trustworthy enough to merge, then leaves a signed record of that decision. This page explains the design, in the order the gate enforces it.</p></header>
+<section id="system" aria-labelledby="system-h"><h2 id="system-h">The whole system</h2><p class="lead">A green check tells you that a check with the right name reported success. It does not tell you the check ran on the exact code being merged, that it was not silently skipped, or that the pull request did not edit the check on its way in. Siglum splits the work across two jobs and puts the trust boundary between them.</p><figure><div class="diagram"><svg viewBox="0 0 960 210" role="img" aria-labelledby="bnd-t bnd-d"><title id="bnd-t">The gather job is untrusted, the seal and enforce job is trusted</title><desc id="bnd-d">The gather job runs over the pull request, read-only with no secrets, and produces evidence only. Digest-pinned evidence crosses to the seal and enforce job, which is org-controlled, pinned to the base, never checks out the pull request's code, anchors every policy input to the base, recomputes the verdict, signs it, and posts the check.</desc><defs><marker id="barrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--accent)"/></marker></defs><rect x="10" y="10" width="370" height="180" class="caution-box"/><text x="30" y="42" class="node-title">gather job (untrusted)</text><text x="30" y="72">Runs over the pull request</text><text x="30" y="102">Read-only, holds no secrets</text><text x="30" y="132">Produces evidence only</text><text x="30" y="162">Cannot assert a verdict</text><rect x="580" y="10" width="370" height="180" class="accent-box"/><text x="600" y="42" class="node-title">seal + enforce job (trusted)</text><text x="600" y="72">Org-controlled, pinned to the base</text><text x="600" y="102">Never checks out the PR's code</text><text x="600" y="132">Anchors every policy input to base</text><text x="600" y="162">Recomputes, signs, posts the check</text><path d="M384 105H576" class="wire" marker-end="url(#barrow)"/><text x="480" y="93" text-anchor="middle" class="label">digest-pinned evidence</text></svg></div><figcaption>Anything the author can edit lands in the gather job. Its output is consumed downstream only as untrusted, digest-pinned observations: a status and an artifact digest for each validator.</figcaption></figure><p>Every security-relevant fact about the verdict, which validators are required and at which pinned version, is taken from the base policy and never from the gather artifact. The trusted job never runs the author's code and never holds a token the pull request can reach.</p></section><section id="verdict" aria-labelledby="verdict-h"><h2 id="verdict-h">Evidence becomes a verdict</h2><p>The core takes the evidence about a change and computes one verdict. It is a pure function: the same evidence always produces the same verdict, and a verifier can re-run the decision offline later.</p><dl class="definition"><dt>PASS</dt><dd>Every required validator ran to completion and reported success.</dd><dt>FAIL</dt><dd>A required validator reported failure.</dd><dt>ERROR</dt><dd>The evidence is malformed, a policy could not be read, or a validator ended in a state the policy cannot accept.</dd><dt>Coverage</dt><dd>FULL when every required validator produced evidence; INCOMPLETE otherwise. A skipped validator is a coverage gap, never a pass.</dd><dt>Independence</dt><dd>Satisfied when the gate's identity, the enforcement configuration, and the anchored inputs all held during the run.</dd><dt>Decision hash</dt><dd>A digest over the evidence and the verdict. Anything stored or posted is recomputed on deserialization and rejected if it does not recompute.</dd></dl><div class="note"><p>A change is mergeable only when the verdict is PASS, coverage is FULL, and independence is satisfied. Anything missing fails closed.</p></div></section><section id="order" aria-labelledby="order-h"><h2 id="order-h">The order of enforcement</h2><p>The trusted gate enforces these stops in order, because the order is part of the design. Each stop fails closed and posts a failing check before the next one runs.</p><ol><li><strong>Identity.</strong> At the Sealed tier the gate mints its own GitHub Actions OIDC token, verifies its signature, issuer, audience, and expiry, and enforces the claims against an org-pinned gate-identity policy: the repository, the workflow reference, a protected ref the author cannot edit, and a hosted runner. The trigger actor string is never the authority. The conformance suite rejects <code>alg:none</code>, key-type confusion, a wrong issuer or audience, expiry, a bad signature, a self-hosted runner, and an absent run.</li><li><strong>Policy tightness.</strong> The gate-identity policy is anchored to the base and parsed tight: a wildcard workflow path is rejected, and a concrete workflow path and a non-empty list of refs are required. <code>siglum setup check</code> verifies that the declared ref is the protected default branch.</li><li><strong>Enforcement self-audit.</strong> The gate reads its own enforcement configuration through the App API and fails closed unless the <code>siglum</code> check is required on a protected branch and source-restricted to the Siglum App by id. A policy that requires independence but has no App credentials also fails closed.</li><li><strong>Evidence normalization.</strong> The required flag and the pinned version for every validator come from the base policy. A base-required validator the gather job did not produce is filled with UNKNOWN, duplicate ids are rejected, and ids the base policy did not declare are ignored.</li><li><strong>Anchored inputs.</strong> The trusted job reads the head version of each anchored path itself, at the head SHA, through the App contents API, and fails closed when the head overrides a base-anchored input such as the policy, a scanner config, or the workflow.</li><li><strong>Approval binding.</strong> When the policy requires approval, the approved SHA is computed per reviewer from the reviews the gate reads with its own token, cleared by a later request for changes, and must equal the head being gated. Approve one commit and force-push another fails closed, and the comment asks for a re-approval of the current head. In a merge queue the gate proves instead that the protected target branch requires an approving review.</li><li><strong>Recompute guard, then signing.</strong> The verdict and the decision hash are recomputed on deserialization. At the Sealed tier the gate signs the attestation and self-verifies the signed bundle before it posts success. There is never a green check without a verified attestation behind it.</li></ol></section><section id="attestation" aria-labelledby="attestation-h"><h2 id="attestation-h">What the attestation contains</h2><p>The verdict is sealed into an in-toto validation predicate, the validation-side sibling to SLSA build provenance. It is keyless-signed through Sigstore, recorded in a transparency log, and verifiable offline with <code>cosign</code> and a strict identity policy, with no Siglum service in the loop.</p><pre><code>cosign verify-attestation \
+  --type https://siglum.dev/ValidationAttestation/v0.3 \
+  --certificate-identity-regexp '^https://github.com/your-org/' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  your-artifact</code></pre><p>The attestation's subject is the merge candidate. A release of a different artifact is outside the claim unless the release workflow checks the attestation for the exact commit being released, which is the opt-in publish gate.</p><div class="note caution"><p>Signing is pinned to Sigstore staging and refuses to run against production, because production signing is deliberately gated behind explicit review. Until that path is wired, every attestation should be treated as non-production.</p></div></section><section id="tiers" aria-labelledby="tiers-h"><h2 id="tiers-h">Two tiers, one core</h2><div class="two-columns"><div><h3>Dry-run</h3><p>Runs in your normal CI and previews the verdict.</p><p>Use it to author policy and to see where a gate silently skips.</p><p>No verified identity. It does not sign.</p></div><div><h3>Sealed</h3><p>Runs in an org-controlled workflow outside the pull request's pipeline.</p><p>Verifies its own GitHub Actions OIDC identity and signs the attestation.</p><p>Defends against a contributor who can push and edit CI but has no organization-admin rights.</p></div></div><p>A pull request from an AI agent is treated exactly like one from any other contributor. The guarantee never depends on trusting the author, so it holds whether the author is a person or an agent.</p></section><section id="boundary" aria-labelledby="boundary-h"><h2 id="boundary-h">What Siglum does not defend against</h2><ul><li><strong>A compromised organization administrator.</strong> An admin who disables branch protection, removes the required check, or changes the org-pinned workflow defeats the gate. The runtime self-audit detects a missing or loose deployment; it cannot stop an administrator who turns enforcement off.</li><li><strong>Validators that execute head-authored code.</strong> The model is sound for read-only validators, which apply base logic over head data. That is why this version ships only the read-only secret-scan validator.</li><li><strong>The adequacy of the validation.</strong> Siglum attests that the validators ran and that the verdict follows from their evidence. It does not judge whether they were the right validators or strict enough.</li><li><strong>Production-grade signing.</strong> Staging attestations are not production evidence.</li></ul><p>The guarantee also rests on stated assumptions: GitHub's OIDC issuer, branch protection, and rulesets behave as documented; the organization deploys the pinned workflow and restricts the <code>siglum</code> check to the App; and the App's credentials are held as organization or repository secrets the pull request cannot reach.</p></section><section id="status" aria-labelledby="status-h"><h2 id="status-h">Status discipline</h2><p>The decision logic is unit-tested through in-memory fakes. Every live call the gate makes at runtime is exercised only in a real CI workflow, never in unit tests. The split is stated for each part.</p><div class="table-wrap"><table><thead><tr><th>Part</th><th>Unit-tested</th><th>Live run only</th></tr></thead><tbody><tr><td>Verdict core and decision hash</td><td>Yes</td><td>No live calls</td></tr><tr><td>Policy anchoring</td><td>Override detection</td><td>Reading base and head files through the App API</td></tr><tr><td>Verified identity</td><td>Token verification and claim enforcement, adversarial suite</td><td>Minting the Actions OIDC token, the JWKS fetch</td></tr><tr><td>Enforcement self-audit</td><td>The predicate and the preflight</td><td>Reading enforcement configuration and branch protection</td></tr><tr><td>Approval proof</td><td><code>prove_approval</code> and head binding</td><td>Fetching reviews and the pull request head</td></tr><tr><td>Signing</td><td>Offline verification path</td><td>Sigstore signing, against staging</td></tr><tr><td>Check-run and comment</td><td>Rendering</td><td>Posting through the App</td></tr></tbody></table></div><p>Roadmap at this revision: production Sigstore, and an end-to-end run on a real repository.</p></section><section id="using" aria-labelledby="using-h"><h2 id="using-h">Using it</h2><pre><code>git clone https://github.com/siglum-dev/siglum &amp;&amp; cd siglum
+python -m pip install -e ".[dev]"
+
+# where can the gate be bypassed today? reads only, changes nothing
+siglum audit --repo owner/name
+
+# walk the whole flow locally with no GitHub access
+siglum demo scaffold --out /tmp/gate-proof-demo --repo owner/gate-proof-demo --force
+cd /tmp/gate-proof-demo
+siglum audit --config siglum-audit-config.json || true
+siglum setup check --local .</code></pre><p>To deploy the Sealed gate: register a GitHub App in your own organization, deploy the org-controlled seal and enforce reusable workflow pinned to an immutable ref, make the <code>siglum</code> check required in your ruleset with its source restricted to that App, and give the workflow the App id, installation id, and private key as secrets. Point <code>SIGLUM_PACKAGE_SPEC</code> at a commit SHA or a pinned release so the code the trusted job runs cannot drift.</p><div class="note"><p>Siglum is a merge gate. A release workflow that runs off a tag or a branch can ship an artifact whose source never passed the gate. To extend the claim to what shipped, the release job must verify the attestation for the exact commit and fail closed without one.</p></div></section><section id="source" aria-labelledby="source-h"><h2 id="source-h">Source map</h2><p>Where the parts above live in the repository, by module name at this revision.</p><div class="table-wrap"><table><thead><tr><th>Path</th><th>Role</th></tr></thead><tbody><tr><td><code>src/siglum/gate/orchestrate.py</code></td><td>The trusted job's sequence: identity, self-audit, evidence normalization, anchoring, verdict, signing, posting</td></tr><tr><td><code>src/siglum/gate/evidence.py</code></td><td>Normalizes gather output against the base policy; fills missing validators with UNKNOWN</td></tr><tr><td><code>src/siglum/gate/anchor.py</code>, <code>authority.py</code>, <code>enforcement.py</code></td><td>Base-anchored inputs, gate-identity policy, and the enforcement predicate</td></tr><tr><td><code>src/siglum/gate/mergeable_subject.py</code>, <code>binding.py</code></td><td>Approval proof bound to the head SHA</td></tr><tr><td><code>src/siglum/verdict.py</code>, <code>policy.py</code>, <code>predicate.py</code></td><td>The verdict core, policy loading, and the in-toto predicate</td></tr><tr><td><code>src/siglum/sealing/</code></td><td>DSSE envelope, identity, Sigstore sealing, and signed-bundle verification</td></tr><tr><td><code>src/siglum/forge/oidc.py</code>, <code>github_app.py</code></td><td>Actions OIDC token verification and GitHub App authentication</td></tr><tr><td><code>src/siglum/validators/secrets.py</code></td><td>The read-only secret-scan validator that runs in the gather job</td></tr><tr><td><code>src/siglum/audit/</code></td><td>The repository audit: branch protection, rulesets, workflows, findings</td></tr><tr><td><code>src/siglum/setup_check.py</code>, <code>demo_scaffold.py</code>, <code>cli.py</code></td><td>The preflight, the local demo, and the command line</td></tr></tbody></table></div></section>
+<footer>Prepared from the Siglum repository at revision aced206. Signing runs against Sigstore staging at this revision, so attestations are non-production until production Sigstore is wired.</footer>
+</article></main>
+</div>
+</body>
+</html>

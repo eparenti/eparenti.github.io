@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="How Ambara stores, serves, and protects shared project context for coding agents: the context repository, the server, the tools agents call, entry types and write paths, the policy gate, project sources, CI capture, and release proof.">
+<meta name="color-scheme" content="light">
+<title>How Ambara works</title>
+<style>
+:root {
+  --ink: oklch(0.25 0.025 270);
+  --muted: oklch(0.46 0.025 270);
+  --accent: oklch(0.45 0.18 270);
+  --accent-soft: oklch(0.96 0.018 270);
+  --context: oklch(0.43 0.085 175);
+  --context-soft: oklch(0.96 0.025 175);
+  --caution: oklch(0.43 0.10 60);
+  --caution-soft: oklch(0.97 0.025 75);
+  --line: oklch(0.83 0.02 270);
+  --surface: oklch(0.98 0.005 270);
+  --white: oklch(1 0 0);
+  font-family: "Noto Sans", "Segoe UI", Arial, sans-serif;
+  color: var(--ink); background: var(--white); font-synthesis: none;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+body { margin: 0; font-size: 16px; line-height: 1.65; }
+a { color: var(--accent); text-underline-offset: 3px; }
+a:hover { text-decoration-thickness: 2px; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+.skip { position: absolute; top: -100px; left: 20px; padding: 10px 18px; background: var(--white); z-index: 2; }
+.skip:focus { top: 10px; }
+.masthead { border-bottom: 1px solid var(--line); }
+.masthead-inner { max-width: 1240px; margin: auto; padding: 20px 32px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.identity { display: flex; align-items: center; gap: 12px; font-weight: 700; }
+.mark { display: grid; place-items: center; width: 36px; height: 36px; background: var(--accent); color: var(--white); border-radius: 6px; font-size: 14px; }
+.edition { font-size: 14px; color: var(--muted); font-weight: 400; }
+.toolbar-links { margin: 0; font-size: 14px; color: var(--muted); white-space: nowrap; }
+.layout { display: grid; grid-template-columns: 196px minmax(0, 1fr); gap: 56px; max-width: 1240px; margin: auto; padding: 48px 32px 64px; }
+.contents { align-self: start; position: sticky; top: 24px; }
+.contents h2 { margin: 0 0 10px; font-size: 15px; line-height: 1.4; }
+.contents ol { list-style: none; padding: 0; margin: 0; }
+.contents li { margin: 0; }
+.contents a { display: block; padding: 7px 10px; margin: 0 -10px; font-size: 14px; text-decoration: none; border-radius: 5px; color: var(--muted); }
+.contents a:hover { color: var(--accent); background: var(--accent-soft); }
+.contents .small { margin-top: 28px; }
+main, article { min-width: 0; }
+h1, h2, h3 { line-height: 1.2; text-wrap: balance; }
+h1 { font-size: clamp(2.25rem, 4.5vw, 3.3rem); letter-spacing: -0.025em; font-weight: 750; margin: 12px 0 22px; max-width: 20ch; }
+h2 { font-size: 1.9rem; letter-spacing: -0.02em; margin: 0 0 20px; }
+h3 { font-size: 1.15rem; margin: 30px 0 12px; }
+p, li, dd { text-wrap: pretty; }
+p { max-width: 73ch; margin: 0 0 18px; }
+ul, ol { padding-left: 23px; }
+li { margin-bottom: 7px; }
+.lead { font-size: 1.14rem; line-height: 1.65; max-width: 64ch; }
+.metadata { display: flex; flex-wrap: wrap; gap: 8px 18px; color: var(--muted); font-size: 14px; }
+.small { font-size: 14px; line-height: 1.6; color: var(--muted); }
+section { margin-top: 64px; padding-top: 10px; scroll-margin-top: 24px; }
+.definition { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 9px 20px; margin: 25px 0; }
+.definition dt { font-weight: 700; }
+.definition dd { margin: 0; max-width: 74ch; }
+.note { padding: 20px 24px; margin: 24px 0; background: var(--accent-soft); border-radius: 8px; }
+.note p { margin: 0; }
+.note.caution { background: var(--caution-soft); color: var(--caution); }
+figure { margin: 28px 0; }
+.diagram { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 12px; }
+.diagram svg { display: block; width: 100%; min-width: 700px; height: auto; }
+figcaption { margin-top: 12px; color: var(--muted); font-size: 14px; line-height: 1.6; max-width: 78ch; }
+svg text { font-family: "Noto Sans", "Segoe UI", Arial, sans-serif; font-size: 17px; fill: var(--ink); }
+svg .label { font-size: 14px; fill: var(--muted); }
+svg .node-title { font-size: 18px; font-weight: 700; }
+svg .box { fill: var(--white); stroke: var(--line); stroke-width: 1.4; rx: 8px; }
+svg .accent-box { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.4; rx: 8px; }
+svg .context-box { fill: var(--context-soft); stroke: var(--context); stroke-width: 1.4; rx: 8px; }
+svg .caution-box { fill: var(--caution-soft); stroke: var(--caution); stroke-width: 1.4; rx: 8px; }
+svg .wire { fill: none; stroke: var(--accent); stroke-width: 2; }
+.table-wrap { max-width: 100%; overflow-x: auto; margin: 24px 0; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; text-align: left; }
+caption { text-align: left; font-weight: 700; padding-bottom: 10px; }
+th, td { vertical-align: top; border-bottom: 1px solid var(--line); padding: 13px 12px; }
+th { font-weight: 700; background: var(--surface); }
+td:first-child { font-weight: 600; }
+.two-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; }
+.two-columns h3 { margin-top: 12px; }
+code, pre { font-family: "Adwaita Mono", "Cascadia Code", Consolas, monospace; font-size: 0.88em; }
+code { overflow-wrap: anywhere; }
+pre { background: var(--surface); padding: 20px 22px; border: 1px solid var(--line); border-radius: 8px; overflow: auto; line-height: 1.65; }
+pre code { font-size: 1em; overflow-wrap: normal; }
+footer { margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+@media (max-width: 1000px) {
+  .layout { grid-template-columns: 160px minmax(0, 1fr); gap: 30px; padding-inline: 24px; }
+}
+@media (max-width: 760px) {
+  .masthead-inner { padding: 16px 20px; flex-wrap: wrap; }
+  .identity .edition { display: none; }
+  .layout { display: block; padding: 24px 20px 40px; }
+  .contents { position: static; margin-bottom: 36px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+  .contents ol { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+  .contents a { margin: 0; padding: 5px 0; }
+  .contents .small { display: none; }
+  h1 { font-size: clamp(2.1rem, 7vw, 3rem); }
+  h2 { font-size: 1.65rem; }
+  section { margin-top: 46px; }
+  .two-columns { grid-template-columns: 1fr; gap: 8px; }
+  .definition { grid-template-columns: 110px minmax(0, 1fr); gap: 10px 12px; }
+  .note { padding: 18px; }
+  .diagram { padding: 8px; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+@media print {
+  @page { size: A4; margin: 16mm; }
+  body { font-size: 10pt; line-height: 1.5; }
+  .skip, .contents, .toolbar-links { display: none !important; }
+  .masthead-inner { padding: 0 0 10pt; }
+  .layout { display: block; padding: 20pt 0 0; max-width: none; }
+  h1 { font-size: 30pt; max-width: none; }
+  h2 { font-size: 20pt; }
+  h3 { font-size: 12pt; }
+  .lead { font-size: 12pt; }
+  section { margin-top: 28pt; padding-top: 0; }
+  h2, h3 { break-after: avoid; }
+  figure, pre, .note, tr { break-inside: avoid; }
+  p, li { orphans: 3; widows: 3; }
+  .diagram, .table-wrap { overflow: visible; }
+  .diagram svg, table { min-width: 0 !important; width: 100%; }
+  .note, .diagram, th, .mark { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+  a { color: var(--ink); }
+  footer { font-size: 8pt; }
+}
+
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the document</a>
+<div class="masthead"><div class="masthead-inner">
+  <div class="identity"><span class="mark" aria-hidden="true">AM</span><span>Ambara</span><span class="edition">How it works · v0.8.0, revision d8deed6</span></div>
+  <p class="toolbar-links"><a href="index.html">All products</a> · <a href="ambara.html">Product brief</a></p>
+</div></div>
+<div class="layout">
+<nav class="contents" aria-label="In this document"><h2>In this document</h2><ol><li><a href="#system">The whole system</a></li><li><a href="#tools">What the agent can do</a></li><li><a href="#entries">Entry types and their write paths</a></li><li><a href="#packets">Startup packets and the value receipt</a></li><li><a href="#policy">Secret scanning and the policy gate</a></li><li><a href="#sources">Project sources</a></li><li><a href="#capture">CI capture</a></li><li><a href="#privacy">Privacy boundary</a></li><li><a href="#proof">How releases are proven</a></li><li><a href="#source">Source map</a></li></ol>
+<p class="small">Built-in agent memory is for personal preferences and tool behavior. Ambara is for project facts that should survive tool changes and team changes.</p></nav>
+<main id="main"><article>
+<header><div class="metadata"><span>Technical guide</span><span>Prepared 7 November 2026</span><span>Source: README and docs at revision d8deed6</span></div><h1>How Ambara works</h1><p class="lead">Ambara is the shared project context layer beside an agent's private memory. Project facts that need provenance (decisions, workflows, handoffs, constraints, status) live in git, durable updates are reviewable, and every write is explicit.</p></header>
+<section id="system" aria-labelledby="system-h"><h2 id="system-h">The whole system</h2><p class="lead">Context lives in a git repository of Markdown files with YAML frontmatter. The Ambara server indexes, ranks, and filters it, applies privacy filters and secret scanning, and serves it to agents over MCP (the protocol that lets AI coding tools connect to external tools) or through a plain context file any agent can read.</p><figure><div class="diagram"><svg viewBox="0 0 760 300" role="img" aria-labelledby="stk-t stk-d"><title id="stk-t">Context repository, Ambara server, agent clients</title><desc id="stk-d">The context repository is normal git with reviewed Markdown and YAML frontmatter, giving reviews, history, and provenance. The Ambara server indexes, ranks, filters, and applies privacy filters and secret scanning. Clients are Claude Code, Cursor, Codex, Gemini, and any MCP client.</desc><defs><marker id="garrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--accent)"/></marker></defs><rect x="140" y="12" width="480" height="64" class="box"/><text x="380" y="40" text-anchor="middle" class="node-title">Context repository</text><text x="380" y="62" text-anchor="middle" class="label">Normal git: reviewed Markdown with YAML frontmatter, history, provenance</text><path d="M380 78V100" class="wire" marker-end="url(#garrow)"/><rect x="140" y="104" width="480" height="64" class="accent-box"/><text x="380" y="132" text-anchor="middle" class="node-title">Ambara server</text><text x="380" y="154" text-anchor="middle" class="label">Indexes, ranks, filters; privacy filters and secret scanning before anything renders</text><path d="M380 170V192" class="wire" marker-end="url(#garrow)"/><rect x="140" y="196" width="480" height="64" class="context-box"/><text x="380" y="224" text-anchor="middle" class="node-title">Agent clients</text><text x="380" y="246" text-anchor="middle" class="label">Claude Code · Codex · Cursor · Gemini · any MCP client, or a plain context file</text></svg></div><figcaption>When a developer starts a task, the agent calls startup to get relevant context, then works normally. When the developer says "save this" or "record that decision", the agent handles the filing.</figcaption></figure></section><section id="tools" aria-labelledby="tools-h"><h2 id="tools-h">What the agent can do</h2><p>The agent calls tools; the person never learns an API. These are the tools the MCP server exposes at this revision.</p><div class="table-wrap"><table><thead><tr><th>Tool</th><th>Purpose</th></tr></thead><tbody><tr><td><code>startup()</code></td><td>Relevant context before working. The recommended entry point.</td></tr><tr><td><code>context()</code></td><td>Relevant decisions, project state, and project source inputs.</td></tr><tr><td><code>sync()</code></td><td>Refresh the local index from the context repository.</td></tr><tr><td><code>read()</code> / <code>read_many()</code></td><td>Full text for entries the agent directly relies on.</td></tr><tr><td><code>query()</code> / <code>search()</code></td><td>Deep-dive on a topic, or keyword search across all entries.</td></tr><tr><td><code>record()</code></td><td>Save a handoff, project update, or active note.</td></tr><tr><td><code>propose()</code></td><td>Save a decision or workflow for team review through a review branch or request.</td></tr><tr><td><code>promote(artifact_id)</code></td><td>Promote a labeled source artifact (a pull request, issue, or page) into durable reviewed knowledge. Dry-run by default.</td></tr><tr><td><code>hygiene()</code> / <code>expire()</code></td><td>Lifecycle advisories for stale context, and marking an entry expired.</td></tr><tr><td><code>feedback(entry_id, signal)</code></td><td>Mark context as useful, noisy, stale, duplicate, or pinned locally.</td></tr><tr><td><code>explain()</code> / <code>status()</code> / <code>validate()</code></td><td>What Ambara does and does not track; connection health and sync state; schema and constraint checks.</td></tr></tbody></table></div></section><section id="entries" aria-labelledby="entries-h"><h2 id="entries-h">Entry types and their write paths</h2><dl class="definition"><dt>active</dt><dd>Short-lived handoffs. "Left off at the token endpoint." Expires automatically.</dd><dt>project</dt><dd>Current project state. "Auth migration is in flight."</dd><dt>decision</dt><dd>Reviewed team decision. "Use gRPC for internal services." Goes through the reviewed path.</dd><dt>workflow</dt><dd>Recurring team process. "Run validation before review." Goes through the reviewed path.</dd><dt>principle</dt><dd>Durable standard. "Restricted data stays out of context entries."</dd></dl><p>Decisions and workflows are proposed on a review branch. GitHub pull requests and GitLab merge requests are first-class review backends; other git hosts fall back to branch-only. If Ambara only created a branch and did not open a review request, it says so.</p><p>Context needs maintenance. Ambara generates cleanup review branches that expire stale handoffs and flag durable entries for revalidation, and agents get quiet advisories inside <code>context()</code> so they know not to rely on stale entries.</p></section><section id="packets" aria-labelledby="packets-h"><h2 id="packets-h">Startup packets and the value receipt</h2><p>A startup packet is compact on purpose. It carries the entries that match the project, with full bodies deferred until the agent calls <code>read()</code> for one it relies on. Each packet includes a value receipt: the size of the Ambara payload, what was deferred, and an estimate of tokens avoided compared with a full dump of eligible context.</p><p>A local aggregate value ledger is on by default, so <code>ambara value</code> can show the savings captured ambiently while you worked.</p><div class="note caution"><p>Reported savings are Ambara app-payload estimates with conservative low and high ranges. They are not total client, session, or cache billing, and not measured tokenizer truth. Currency estimates appear only when a deployment supplies its own token price; Ambara never invents a universal dollar value.</p></div></section><section id="policy" aria-labelledby="policy-h"><h2 id="policy-h">Secret scanning and the policy gate</h2><p>Write and render paths run policy checks before durable writes and before startup output.</p><ul><li>Known credential-shaped patterns are blocked or redacted before they reach durable writes or startup rendering.</li><li>Configured PII, confidentiality, and personnel patterns require review.</li><li>Source text from review artifacts and issues is normalized through the central policy path before surfacing.</li><li>Commit capture and CI capture apply the same content-policy gate as interactive writes, beyond regex secret scanning.</li></ul><p>Security, privacy, and secret scanning are release gates for this product. They are not optional hardening.</p></section><section id="sources" aria-labelledby="sources-h"><h2 id="sources-h">Project sources</h2><p>Ambara can read labeled GitHub pull requests, GitLab merge requests, and Jira issues and surface them as project context: continue, reuse, revise, pause, handoff, or clarify. Providers translate external APIs into bounded source artifacts; the core owns central safety, identity minimization, body policy, token budgets, provenance, cache health, and rendering.</p><div class="table-wrap"><table><thead><tr><th>Tier</th><th>Sources</th><th>Support promise</th></tr></thead><tbody><tr><td>First-class Source Preview</td><td><code>github</code>, <code>gitlab</code>, <code>jira</code>, <code>fixture</code></td><td>Ships in core, registers by default, flows through central safety, per-source health, doctor and smoke commands, conformance tests, and installed proof.</td></tr><tr><td>Fixture-backed public preview</td><td><code>linear</code>, <code>confluence</code></td><td>Registers by default and supports no-network smoke and conformance fixtures. Live API fetch is not claimed.</td></tr><tr><td>Deferred</td><td>Notion, Slack, Teams, Sentry, Google Docs and Drive, Figma</td><td>Not supported. Each needs separate product claims, bounded selectors, privacy proof, and fixtures first.</td></tr></tbody></table></div><p>Core-owned enforcement applies to every provider: credential-shaped text is redacted, unsafe refs and URLs are removed, identity defaults to omitted, body policy is enforced before rendering, excerpts are capped by source budget, external text stays untrusted evidence, and an unavailable source stays visible as unavailable or stale. Providers translate; they cannot bypass the privacy rules.</p></section><section id="capture" aria-labelledby="capture-h"><h2 id="capture-h">CI capture</h2><p>Commit-driven capture bootstraps the knowledge repo from the declared remote, applies forge-aware authenticated remotes when a token is provided, fetches the main branch, and evaluates explicit <code>ambara:</code> commit messages with the same content-policy gate as interactive writes. GitHub uses the bundled composite action. GitLab CI runs the entrypoint directly.</p><pre><code>ambara_capture:
+  image: python:3.12
+  variables:
+    AMBARA_KNOWLEDGE_REMOTE: https://gitlab.com/your-org/team-context.git
+    AMBARA_KNOWLEDGE_TOKEN: $AMBARA_KNOWLEDGE_TOKEN
+    AMBARA_MAIN_BRANCH: main
+  script:
+    - pip install ambara
+    - python -m ambara.action.capture</code></pre><p>This is for explicit capture markers and related workflow capture. It is not a generic background collector.</p></section><section id="privacy" aria-labelledby="privacy-h"><h2 id="privacy-h">Privacy boundary</h2><p>Ambara does not log what agents read, track who is online, or create activity feeds. Durable shared context only stores what you explicitly ask it to save. There is no collector for query text, read patterns, editor activity, or participation data; the system cannot track what it was never built to capture.</p><ul><li>Value receipts and the local ledger record aggregate token estimates and omission counts only.</li><li>No query text, response text, body snippets, caller identity, or durable per-entry read receipts are stored.</li><li>Ambara is not a secrets manager, observability product, agent runtime, or total model cost meter.</li><li>It does not prove who read what, infer presence, bypass git review, or replace human review for durable project knowledge.</li></ul></section><section id="proof" aria-labelledby="proof-h"><h2 id="proof-h">How releases are proven</h2><p>The release proof is local and uses no live workplace APIs. Source checkout gates run first, then an installed-wheel smoke, then a container smoke.</p><pre><code>uv run pytest -q
+uv run ruff check .
+uv run mypy src
+env UV_CACHE_DIR=/tmp/ambara-uv-cache uv lock --check
+
+scripts/installed-user-path-smoke.sh
+scripts/docker-install-smoke.sh</code></pre><p>The installed smoke builds a wheel, installs it into a clean environment, runs the demo proof, smokes source doctor and safety paths, verifies the fixture-backed Linear and Confluence previews, and simulates Claude Code, Codex, Cursor, and Gemini through the file-adapter path. The container smoke runs the installed CLI as a non-root user and repeats the demo proof; it proves a single-node install path only.</p><dl class="definition"><dt>v0.5.1</dt><dd>Branch-only fallback says no pull request was created; CI capture bootstraps from the declared remote; capture applies the content-policy gate.</dd><dt>v0.6.0</dt><dd>GitHub and GitLab are both first-class review backends, in fixtures and through the forge-aware write path.</dd><dt>v0.7.0</dt><dd>A deterministic 100-user, 100-agent workday shares context across Codex, Claude Code, Cursor, and Gemini; entry-point providers resolve through one registry and cannot shadow built-ins.</dd></dl><p>If a release claims a behavior, the tests named for it must stay green from the source checkout before release.</p></section><section id="source" aria-labelledby="source-h"><h2 id="source-h">Source map</h2><p>Where the parts above live in the repository, by package at this revision.</p><div class="table-wrap"><table><thead><tr><th>Path</th><th>Role</th></tr></thead><tbody><tr><td><code>src/ambara/core/</code></td><td>Indexing, ranking, the context compiler, and startup packets</td></tr><tr><td><code>src/ambara/cli/</code></td><td>The <code>ambara</code> command line: onboard, demo, serve, startup, record, propose, doctor, and the rest</td></tr><tr><td><code>src/ambara/sources/</code></td><td>The source kernel: provider contract, auth broker, source manager, conformance helpers</td></tr><tr><td><code>src/ambara/providers/</code></td><td>Built-in source providers and the provider registry</td></tr><tr><td><code>src/ambara/capture/</code>, <code>src/ambara/action/</code></td><td>Commit-driven capture and the CI entrypoint</td></tr><tr><td><code>src/ambara/curation/</code></td><td>Cleanup review branches and stale-context advisories</td></tr><tr><td><code>src/ambara/git/</code></td><td>Knowledge repo operations and the GitHub and GitLab review backends</td></tr><tr><td><code>src/ambara/read_model/</code></td><td>The local SQLite read model</td></tr></tbody></table></div></section>
+<footer>Prepared from the Ambara repository at revision d8deed6, version 0.8.0. Earlier PyPI releases were withdrawn; install from the repository.</footer>
+</article></main>
+</div>
+</body>
+</html>

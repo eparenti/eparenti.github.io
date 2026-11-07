@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="How teamctx turns metadata from GitHub, GitLab, Jira, Confluence, and local docs into deterministic, source-backed context before the first edit: the checks, the connectors, the policy gate, the purity boundary, and the three surfaces.">
+<meta name="color-scheme" content="light">
+<title>How teamctx works</title>
+<style>
+:root {
+  --ink: oklch(0.25 0.025 270);
+  --muted: oklch(0.46 0.025 270);
+  --accent: oklch(0.45 0.18 270);
+  --accent-soft: oklch(0.96 0.018 270);
+  --context: oklch(0.43 0.085 175);
+  --context-soft: oklch(0.96 0.025 175);
+  --caution: oklch(0.43 0.10 60);
+  --caution-soft: oklch(0.97 0.025 75);
+  --line: oklch(0.83 0.02 270);
+  --surface: oklch(0.98 0.005 270);
+  --white: oklch(1 0 0);
+  font-family: "Noto Sans", "Segoe UI", Arial, sans-serif;
+  color: var(--ink); background: var(--white); font-synthesis: none;
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; scroll-padding-top: 24px; }
+body { margin: 0; font-size: 16px; line-height: 1.65; }
+a { color: var(--accent); text-underline-offset: 3px; }
+a:hover { text-decoration-thickness: 2px; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 4px; }
+.skip { position: absolute; top: -100px; left: 20px; padding: 10px 18px; background: var(--white); z-index: 2; }
+.skip:focus { top: 10px; }
+.masthead { border-bottom: 1px solid var(--line); }
+.masthead-inner { max-width: 1240px; margin: auto; padding: 20px 32px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+.identity { display: flex; align-items: center; gap: 12px; font-weight: 700; }
+.mark { display: grid; place-items: center; width: 36px; height: 36px; background: var(--accent); color: var(--white); border-radius: 6px; font-size: 14px; }
+.edition { font-size: 14px; color: var(--muted); font-weight: 400; }
+.toolbar-links { margin: 0; font-size: 14px; color: var(--muted); white-space: nowrap; }
+.layout { display: grid; grid-template-columns: 196px minmax(0, 1fr); gap: 56px; max-width: 1240px; margin: auto; padding: 48px 32px 64px; }
+.contents { align-self: start; position: sticky; top: 24px; }
+.contents h2 { margin: 0 0 10px; font-size: 15px; line-height: 1.4; }
+.contents ol { list-style: none; padding: 0; margin: 0; }
+.contents li { margin: 0; }
+.contents a { display: block; padding: 7px 10px; margin: 0 -10px; font-size: 14px; text-decoration: none; border-radius: 5px; color: var(--muted); }
+.contents a:hover { color: var(--accent); background: var(--accent-soft); }
+.contents .small { margin-top: 28px; }
+main, article { min-width: 0; }
+h1, h2, h3 { line-height: 1.2; text-wrap: balance; }
+h1 { font-size: clamp(2.25rem, 4.5vw, 3.3rem); letter-spacing: -0.025em; font-weight: 750; margin: 12px 0 22px; max-width: 20ch; }
+h2 { font-size: 1.9rem; letter-spacing: -0.02em; margin: 0 0 20px; }
+h3 { font-size: 1.15rem; margin: 30px 0 12px; }
+p, li, dd { text-wrap: pretty; }
+p { max-width: 73ch; margin: 0 0 18px; }
+ul, ol { padding-left: 23px; }
+li { margin-bottom: 7px; }
+.lead { font-size: 1.14rem; line-height: 1.65; max-width: 64ch; }
+.metadata { display: flex; flex-wrap: wrap; gap: 8px 18px; color: var(--muted); font-size: 14px; }
+.small { font-size: 14px; line-height: 1.6; color: var(--muted); }
+section { margin-top: 64px; padding-top: 10px; scroll-margin-top: 24px; }
+.definition { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 9px 20px; margin: 25px 0; }
+.definition dt { font-weight: 700; }
+.definition dd { margin: 0; max-width: 74ch; }
+.note { padding: 20px 24px; margin: 24px 0; background: var(--accent-soft); border-radius: 8px; }
+.note p { margin: 0; }
+.note.caution { background: var(--caution-soft); color: var(--caution); }
+figure { margin: 28px 0; }
+.diagram { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 12px; }
+.diagram svg { display: block; width: 100%; min-width: 700px; height: auto; }
+figcaption { margin-top: 12px; color: var(--muted); font-size: 14px; line-height: 1.6; max-width: 78ch; }
+svg text { font-family: "Noto Sans", "Segoe UI", Arial, sans-serif; font-size: 17px; fill: var(--ink); }
+svg .label { font-size: 14px; fill: var(--muted); }
+svg .node-title { font-size: 18px; font-weight: 700; }
+svg .box { fill: var(--white); stroke: var(--line); stroke-width: 1.4; rx: 8px; }
+svg .accent-box { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.4; rx: 8px; }
+svg .context-box { fill: var(--context-soft); stroke: var(--context); stroke-width: 1.4; rx: 8px; }
+svg .caution-box { fill: var(--caution-soft); stroke: var(--caution); stroke-width: 1.4; rx: 8px; }
+svg .wire { fill: none; stroke: var(--accent); stroke-width: 2; }
+.table-wrap { max-width: 100%; overflow-x: auto; margin: 24px 0; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; text-align: left; }
+caption { text-align: left; font-weight: 700; padding-bottom: 10px; }
+th, td { vertical-align: top; border-bottom: 1px solid var(--line); padding: 13px 12px; }
+th { font-weight: 700; background: var(--surface); }
+td:first-child { font-weight: 600; }
+.two-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; }
+.two-columns h3 { margin-top: 12px; }
+code, pre { font-family: "Adwaita Mono", "Cascadia Code", Consolas, monospace; font-size: 0.88em; }
+code { overflow-wrap: anywhere; }
+pre { background: var(--surface); padding: 20px 22px; border: 1px solid var(--line); border-radius: 8px; overflow: auto; line-height: 1.65; }
+pre code { font-size: 1em; overflow-wrap: normal; }
+footer { margin-top: 56px; padding-top: 24px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
+@media (max-width: 1000px) {
+  .layout { grid-template-columns: 160px minmax(0, 1fr); gap: 30px; padding-inline: 24px; }
+}
+@media (max-width: 760px) {
+  .masthead-inner { padding: 16px 20px; flex-wrap: wrap; }
+  .identity .edition { display: none; }
+  .layout { display: block; padding: 24px 20px 40px; }
+  .contents { position: static; margin-bottom: 36px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+  .contents ol { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+  .contents a { margin: 0; padding: 5px 0; }
+  .contents .small { display: none; }
+  h1 { font-size: clamp(2.1rem, 7vw, 3rem); }
+  h2 { font-size: 1.65rem; }
+  section { margin-top: 46px; }
+  .two-columns { grid-template-columns: 1fr; gap: 8px; }
+  .definition { grid-template-columns: 110px minmax(0, 1fr); gap: 10px 12px; }
+  .note { padding: 18px; }
+  .diagram { padding: 8px; }
+}
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+@media print {
+  @page { size: A4; margin: 16mm; }
+  body { font-size: 10pt; line-height: 1.5; }
+  .skip, .contents, .toolbar-links { display: none !important; }
+  .masthead-inner { padding: 0 0 10pt; }
+  .layout { display: block; padding: 20pt 0 0; max-width: none; }
+  h1 { font-size: 30pt; max-width: none; }
+  h2 { font-size: 20pt; }
+  h3 { font-size: 12pt; }
+  .lead { font-size: 12pt; }
+  section { margin-top: 28pt; padding-top: 0; }
+  h2, h3 { break-after: avoid; }
+  figure, pre, .note, tr { break-inside: avoid; }
+  p, li { orphans: 3; widows: 3; }
+  .diagram, .table-wrap { overflow: visible; }
+  .diagram svg, table { min-width: 0 !important; width: 100%; }
+  .note, .diagram, th, .mark { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+  pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+  a { color: var(--ink); }
+  footer { font-size: 8pt; }
+}
+
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to the document</a>
+<div class="masthead"><div class="masthead-inner">
+  <div class="identity"><span class="mark" aria-hidden="true">TC</span><span>teamctx</span><span class="edition">How it works · v0.1.0, revision ae3cacf</span></div>
+  <p class="toolbar-links"><a href="index.html">All products</a> · <a href="teamctx.html">Product brief</a></p>
+</div></div>
+<div class="layout">
+<nav class="contents" aria-label="In this document"><h2>In this document</h2><ol><li><a href="#system">The whole system</a></li><li><a href="#checks">What a check is</a></li><li><a href="#context">Deriving the work context</a></li><li><a href="#connectors">Connectors and the policy gate</a></li><li><a href="#purity">The purity boundary</a></li><li><a href="#trust">Trust model</a></li><li><a href="#surfaces">Three surfaces, one answer</a></li><li><a href="#proof">How the claims are proven</a></li><li><a href="#privacy">Privacy boundary</a></li><li><a href="#source">Source map</a></li></ol>
+<p class="small">The product feels like git status, but for team context. It is not a chatbot that read everything.</p></nav>
+<main id="main"><article>
+<header><div class="metadata"><span>Technical guide</span><span>Prepared 7 November 2026</span><span>Source: README and docs/engineering at revision ae3cacf</span></div><h1>How teamctx works</h1><p class="lead">teamctx keeps you and your agent pinned to the current, source-backed state of the systems your team already uses. Its defining property is that there is no model in the content path: it normalizes, routes, selects, and renders the record, and never reinterprets what the record means.</p></header>
+<section id="system" aria-labelledby="system-h"><h2 id="system-h">The whole system</h2><p class="lead">Approved sources are read by connectors into normalized artifacts. Safety and policy enforcement runs before anything is cached. A pure core derives relationships, evaluates the checks, and selects what to say. Three surfaces render the same answer.</p><figure><div class="diagram"><svg viewBox="0 0 760 576" role="img" aria-labelledby="stk-t stk-d"><title id="stk-t">From approved sources to one rendered answer</title><desc id="stk-d">Approved sources at the top: GitHub, GitLab, Jira, Confluence, and local docs. Below them connectors, then normalized artifacts, then safety and policy enforcement, then the deterministic core that evaluates checks and selects findings, then the three renderers: CLI, Claude Code hook, and MCP tool.</desc><defs><marker id="garrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z" fill="var(--accent)"/></marker></defs><rect x="140" y="12" width="480" height="64" class="box"/><text x="380" y="40" text-anchor="middle" class="node-title">Approved sources</text><text x="380" y="62" text-anchor="middle" class="label">GitHub · GitLab · Jira · Confluence · local docs; opted in, metadata only</text><path d="M380 78V100" class="wire" marker-end="url(#garrow)"/><rect x="140" y="104" width="480" height="64" class="box"/><text x="380" y="132" text-anchor="middle" class="node-title">Connectors</text><text x="380" y="154" text-anchor="middle" class="label">Fetch, paginate, map provider errors; never decide what is safe or relevant</text><path d="M380 170V192" class="wire" marker-end="url(#garrow)"/><rect x="140" y="196" width="480" height="64" class="box"/><text x="380" y="224" text-anchor="middle" class="node-title">Normalized artifacts and relationships</text><text x="380" y="246" text-anchor="middle" class="label">Pull request touches path; branch names issue; doc names a successor</text><path d="M380 262V284" class="wire" marker-end="url(#garrow)"/><rect x="140" y="288" width="480" height="64" class="caution-box"/><text x="380" y="316" text-anchor="middle" class="node-title">Safety and policy enforcement</text><text x="380" y="338" text-anchor="middle" class="label">Field allowlists, secret and PII rules, unsafe URLs and paths, size limits</text><path d="M380 354V376" class="wire" marker-end="url(#garrow)"/><rect x="140" y="380" width="480" height="64" class="accent-box"/><text x="380" y="408" text-anchor="middle" class="node-title">Deterministic core</text><text x="380" y="430" text-anchor="middle" class="label">Evaluate each check, grade severity, select what to surface; pure code</text><path d="M380 446V468" class="wire" marker-end="url(#garrow)"/><rect x="140" y="472" width="480" height="64" class="context-box"/><text x="380" y="500" text-anchor="middle" class="node-title">Three renderers</text><text x="380" y="522" text-anchor="middle" class="label">CLI · Claude Code hook · MCP tool, one broker answer</text></svg></div><figcaption>Connectors fetch. The core decides. Only the core emits findings, and the renderers cannot disagree with it: the hook says less on purpose, but nothing it says contradicts the full report.</figcaption></figure></section><section id="checks" aria-labelledby="checks-h"><h2 id="checks-h">What a check is</h2><p>A check is one question about the work you are about to do, answered from a system of record. Each check returns exactly one of three verdicts, and every line carries the evidence it rests on.</p><dl class="definition"><dt>Overlapping change</dt><dd>Another open pull request or merge request touches a file you are about to change. Your own same-repo pull request for the branch you stand on is set aside with an FYI; a fork pull request still surfaces.</dd><dt>Gate status</dt><dd>A check or pipeline on your branch is failing, or is still running, skipped, or canceled. Anything short of a completed success is reported as not yet confirmed green.</dd><dt>Acceptance criteria changed</dt><dd>The criteria on the linked GitHub or Jira issue changed after you started.</dd><dt>Doc superseded</dt><dd>A document under your declared docs folder names a newer replacement, or a Confluence page carries the <code>teamctx.superseded_by</code> property.</dd><dt>Source unavailable</dt><dd>A configured source could not be reached or could not be fully enumerated. This is its own finding, never folded into a clear.</dd></dl><div class="note"><p>Verdicts: clear, in the way, or not checked with the reason. A green means checked. Where teamctx could not look, it says so plainly instead of implying all is well.</p></div></section><section id="context" aria-labelledby="context-h"><h2 id="context-h">Deriving the work context</h2><p>teamctx derives the issue and the start time from what is already there: a Jira key like PROJ-123 or a GitHub issue number in the branch name, commit trailers, and the merge point with the base branch. The derivation is named in the output so you can judge it, and <code>--issue</code> names one explicitly when the branch does not.</p><pre><code>teamctx work-start --path src/auth/token.py
+teamctx why pr:7 --path src/auth/token.py
+teamctx open-source pr:7 --path src/auth/token.py</code></pre><p>Selectors are the handles you see in the output: <code>pr:N</code>, <code>issue:#N</code>, <code>path:X</code>, <code>doc:PATH</code>, <code>gate:NAME</code>.</p></section><section id="connectors" aria-labelledby="connectors-h"><h2 id="connectors-h">Connectors and the policy gate</h2><p>Connectors belong to source families with family-specific allowlists and default-deny fields. A new vendor must map into one of these families or add a reviewed family contract first.</p><div class="table-wrap"><table><thead><tr><th>Family</th><th>Examples</th><th>Default scope</th><th>Explicit exclusions</th></tr></thead><tbody><tr><td>Forge review</td><td>GitHub, GitLab</td><td>Opted-in repos; pull request and merge request metadata; changed paths; check runs and pipelines</td><td>Comments, patches, broad repository search</td></tr><tr><td>Work tracker</td><td>GitHub issues, Jira</td><td>Opted-in projects; issues, labels, structured acceptance criteria fields</td><td>Arbitrary comments, user analytics, query history</td></tr><tr><td>Docs and process</td><td>Local docs folder, Confluence</td><td>Linked or allowlisted pages; supersession markers; timestamps</td><td>Whole-space dumps, private docs, full bodies by default</td></tr><tr><td>Explicit chat handoff</td><td>Reserved in the architecture</td><td>Allowlisted channels plus an explicit teamctx marker</td><td>Direct messages, private channels, presence, reactions, broad history</td></tr></tbody></table></div><p>Every artifact passes the policy gate before cache and before any finding is rendered. The gate applies field allowlists by family, blocks or redacts credential-shaped strings, reviews PII and confidentiality patterns, rejects unsafe URLs and paths, caps body and excerpt sizes, and classifies sensitivity. Unsafe artifacts are blocked, redacted, or quarantined; findings may report omission counts but never leak blocked content.</p><p>A permission filter rejects any artifact whose requester access cannot be proven. If permission proof is missing, the artifact is ineligible.</p></section><section id="purity" aria-labelledby="purity-h"><h2 id="purity-h">The purity boundary</h2><p>The core package must be pure: no filesystem access, no network access, no subprocesses, no current-time reads, no randomness. It receives artifacts, relationships, policy configuration, and the clock as explicit inputs. All side effects live in connectors, the store, the CLI, or the servers.</p><p>This is why replay works. Feed the same inputs and the same verdict comes out every time, which is also what the emulation harness relies on.</p></section><section id="trust" aria-labelledby="trust-h"><h2 id="trust-h">Trust model</h2><p>Source artifact text is untrusted data. Pull request titles and bodies, issue descriptions, comments, documentation text, and any third-party connector output must never become instructions for an agent or a developer tool.</p><dl class="definition"><dt>message</dt><dd>Broker-authored deterministic text. The sentences you read.</dd><dt>source excerpt</dt><dd>Optional sanitized evidence, never instruction.</dd><dt>reason</dt><dd>The deterministic rule that caused the finding to appear.</dd></dl><p>Trusted inputs are the local policy configuration, the connector configuration, the deterministic rules, and the permission results from the source systems.</p></section><section id="surfaces" aria-labelledby="surfaces-h"><h2 id="surfaces-h">Three surfaces, one answer</h2><div class="two-columns"><div><h3>The command line</h3><p><code>teamctx work-start</code> reproduces by hand what the hook shows, <code>why</code> prints the evidence for one finding, and <code>open-source</code> opens the record.</p></div><div><h3>The Claude Code hook</h3><p>Installed by <code>teamctx onboard</code> or <code>teamctx install-hook</code>. It grounds the session before its first edit, re-checks on an interval, speaks again when something changed, and re-states a standing gap every so often. It never blocks an edit.</p></div></div><p>Agents get the same answer over MCP. The CLI output, the MCP tool result, and the hook signal all derive from one broker answer and one shared classification, so the three can never disagree.</p></section><section id="proof" aria-labelledby="proof-h"><h2 id="proof-h">How the claims are proven</h2><p>An offline emulation harness drives the real CLI, hook, and MCP tool through a 22-row scenario matrix against bundled mock GitHub, GitLab, Jira, and Confluence servers. Each expected block quotes the real renderer.</p><pre><code>python emulation/runner.py --offline --all</code></pre><p>A source becomes supported only after it proves the same honest-coverage behavior in the harness.</p></section><section id="privacy" aria-labelledby="privacy-h"><h2 id="privacy-h">Privacy boundary</h2><p>teamctx observes shared artifacts. It does not observe people. It must not collect private chat, direct messages, email, local editor activity, keystrokes, terminal history, agent prompts or responses, presence, productivity metrics, sentiment, or judgments about coworkers.</p><ul><li>Read-only. It writes nothing to your source systems.</li><li>Explicit opt-in per repository, project, and docs folder.</li><li>Metadata first. No comments, no patches, no bodies by default.</li><li>No broad search and no generated summaries.</li><li>Audit logs record request shape and returned finding ids, never prompts, responses, or raw source bodies.</li></ul></section><section id="source" aria-labelledby="source-h"><h2 id="source-h">Source map</h2><p>Where the parts above live in the repository, by module name at this revision.</p><div class="table-wrap"><table><thead><tr><th>Path</th><th>Role</th></tr></thead><tbody><tr><td><code>src/teamctx/core/</code></td><td>The pure core: contracts, evaluate, select, severity, authority, snapshot, broker</td></tr><tr><td><code>src/teamctx/connectors/forge_review.py</code>, <code>gate_status.py</code></td><td>Overlapping work and check status, over <code>github.py</code>, <code>github_checks.py</code>, and <code>gitlab.py</code></td></tr><tr><td><code>src/teamctx/connectors/issue_criteria.py</code></td><td>Acceptance criteria from <code>github_issues.py</code> and <code>jira.py</code></td></tr><tr><td><code>src/teamctx/connectors/docs_supersession.py</code></td><td>Superseded docs from the local <code>docs.py</code> folder reader and <code>confluence.py</code></td></tr><tr><td><code>src/teamctx/work_start.py</code>, <code>git_context.py</code>, <code>resolve.py</code></td><td>The work-start request and the derivation of issue and start time</td></tr><tr><td><code>src/teamctx/hook.py</code>, <code>hook_signal.py</code>, <code>ambient.py</code></td><td>The Claude Code hook and its interval re-check</td></tr><tr><td><code>src/teamctx/mcp_server.py</code>, <code>cli.py</code>, <code>onboard.py</code></td><td>The MCP tool, the command line, and onboarding</td></tr><tr><td><code>emulation/</code></td><td>The offline scenario harness and mock servers</td></tr></tbody></table></div></section>
+<footer>Prepared from the teamctx repository at revision ae3cacf. Live sources at that revision: GitHub, GitLab, GitHub issues and Jira, local docs and Confluence.</footer>
+</article></main>
+</div>
+</body>
+</html>
